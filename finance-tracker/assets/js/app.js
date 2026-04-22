@@ -3,7 +3,8 @@
  */
 
 import { setState, navigateTo, getState } from './state.js';
-import { load, save, exportAllCSV, exportJSON, importJSON, readFile } from './storage.js';
+import { load, save, exportAllCSV, exportJSON, importJSON, readFile, isUsingCloud } from './storage.js';
+import { checkSupabaseHealth, isConfigured } from './config/supabase.js';
 import { getSeedData } from './data/seed.js';
 import { RecurringService } from './services/recurring.service.js';
 import { initNav, updateBadges } from './components/nav.js';
@@ -32,9 +33,9 @@ const VIEWS = {
 /**
  * Initialize the application
  */
-function init() {
+async function init() {
   // Load saved state or use seed data
-  let state = load();
+  let state = await load();
 
   if (!state || !state.transactions || state.transactions.length === 0) {
     const seed = getSeedData();
@@ -81,8 +82,64 @@ function init() {
   RecurringService.checkDue();
   updateBadges();
 
+  // Show connection status
+  await checkConnectionStatus();
+
   // Navigate to dashboard
   navigateTo('dashboard');
+}
+
+async function checkConnectionStatus() {
+  const topBar = document.querySelector('.top-bar');
+  if (!topBar) return;
+
+  let status = document.getElementById('connection-status');
+  if (!status) {
+    status = document.createElement('div');
+    status.id = 'connection-status';
+    status.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: 500; transition: all 0.3s ease;';
+    status.title = 'Click to see Supabase config';
+    status.onclick = () => {
+      const env = import.meta.env;
+      console.log('Supabase URL:', env.VITE_SUPABASE_URL || 'Not set');
+      const selectedKey = env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      console.log('Active Key Type:', env.VITE_SUPABASE_ANON_KEY ? 'anon' : env.VITE_SUPABASE_PUBLISHABLE_KEY ? 'publishable' : 'missing');
+      console.log('Active Key:', selectedKey ? '***' + selectedKey.slice(-10) : 'Not set');
+    };
+    topBar.appendChild(status);
+  }
+
+  async function updateStatus() {
+    const configured = isConfigured && isConfigured();
+    
+    if (!configured) {
+      status.innerHTML = '<span style="width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF;\"></span> Not Configured';
+      status.style.background = 'rgba(156, 163, 175, 0.1)';
+      status.style.color = '#6B7280';
+      status.style.border = '1px solid rgba(156, 163, 175, 0.3)';
+      return;
+    }
+
+    const healthy = await checkSupabaseHealth();
+    
+    if (healthy) {
+      status.innerHTML = '<span style="width: 8px; height: 8px; border-radius: 50%; background: #10B981;\"></span> Supabase Online';
+      status.style.background = 'rgba(16, 185, 129, 0.15)';
+      status.style.color = '#059669';
+      status.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+    } else {
+      status.innerHTML = '<span style="width: 8px; height: 8px; border-radius: 50%; background: #EF4444;\"></span> Supabase Offline';
+      status.style.background = 'rgba(239, 68, 68, 0.15)';
+      status.style.color = '#991B1B';
+      status.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+    }
+  }
+
+  // Initial check
+  await updateStatus();
+  
+  // Poll every 30 seconds for status changes
+  setInterval(updateStatus, 30000);
 }
 
 function registerKeyboardShortcuts() {
@@ -375,7 +432,11 @@ function showSettingsModal() {
 }
 
 // Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init().catch((error) => {
+    console.error('App initialization failed:', error);
+  });
+});
 
 // Make navigateTo available globally for nav.js
 window.navigateTo = navigateTo;
