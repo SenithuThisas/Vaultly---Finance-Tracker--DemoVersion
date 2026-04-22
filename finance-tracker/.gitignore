@@ -1,12 +1,40 @@
-# Supabase
+# ========================
+# Environment / Secrets
+# ========================
 .env
 .env.local
 .env.*.local
-.env.example
+.env.production
 
+# ========================
+# Node / Vite
+# ========================
+node_modules/
+dist/
+.vite/
+vite.config.js.timestamp-*
+
+# ========================
 # Logs
+# ========================
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
+# ========================
+# Editor
+# ========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ========================
 # OS
+# ========================
 .DS_Store
 Thumbs.db
+desktop.ini
