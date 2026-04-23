@@ -8,6 +8,25 @@ import {
 } from './config/supabase.js';
 
 let _onAuthReady = null; // callback when user is authenticated
+const AUTH_READY_TIMEOUT_MS = 20000;
+
+function withTimeout(promise, label, timeoutMs = AUTH_READY_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -25,7 +44,12 @@ export async function initAuth(onAuthenticated) {
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       showLoading();
-      await _onAuthReady(session.user);
+      try {
+        await withTimeout(_onAuthReady(session.user), 'auth ready callback (SIGNED_IN)');
+      } catch (error) {
+        console.error('Auth ready callback failed after SIGNED_IN:', error);
+        showAuth();
+      }
     }
     if (event === 'SIGNED_OUT') {
       showAuth();
@@ -37,10 +61,21 @@ export async function initAuth(onAuthenticated) {
   });
 
   // Check existing session
-  const session = await getSession();
+  let session = null;
+  try {
+    session = await getSession();
+  } catch (error) {
+    console.error('Session restore check failed:', error);
+  }
+
   if (session) {
     showLoading();
-    await _onAuthReady(session.user);
+    try {
+      await withTimeout(_onAuthReady(session.user), 'auth ready callback (session restore)');
+    } catch (error) {
+      console.error('Auth ready callback failed during session restore:', error);
+      showAuth();
+    }
   } else {
     hideLoading();
     showAuth();
