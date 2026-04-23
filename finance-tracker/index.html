@@ -16,11 +16,207 @@
   <link rel="stylesheet" href="assets/css/components.css">
   <link rel="stylesheet" href="assets/css/charts.css">
   <link rel="stylesheet" href="assets/css/responsive.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
   <script type="module" src="assets/js/app.js"></script>
 </head>
 
 <body>
-  <!-- Sidebar backdrop -->
+  <!-- ════ Auth Wrapper ════ -->
+  <div id="auth-wrapper" class="hidden">
+    <div class="auth-container">
+      <!-- Left side (branding) -->
+      <div class="auth-brand">
+        <div class="auth-brand-logo">🔐</div>
+        <h1>Vaultly</h1>
+        <p class="tagline">Your personal finance vault</p>
+        <div class="auth-features">
+          <div class="auth-feature">
+            <div class="auth-feature-icon">🏦</div>
+            <span>Track all your bank accounts</span>
+          </div>
+          <div class="auth-feature">
+            <div class="auth-feature-icon">📊</div>
+            <span>Monitor budgets & spending</span>
+          </div>
+          <div class="auth-feature">
+            <div class="auth-feature-icon">🔒</div>
+            <span>Your data, private & secure</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Right side (forms) -->
+      <div class="auth-form-panel">
+        <div class="auth-form-card">
+          <div class="auth-mobile-logo">
+            <div class="brand-icon">🔐</div>
+            <h2>Vaultly</h2>
+          </div>
+          
+          <!-- Login View -->
+          <div id="auth-login" class="auth-view active">
+            <div class="auth-header">
+              <h2>Welcome back</h2>
+              <p>Sign in to your vault</p>
+            </div>
+            <div id="login-alert" class="auth-alert"></div>
+            <form id="login-form">
+              <div class="auth-input-group">
+                <span class="auth-input-icon">✉️</span>
+                <input type="email" id="login-email" class="auth-input" placeholder="your@email.com" required autofocus>
+              </div>
+              <div class="auth-input-group">
+                <span class="auth-input-icon">🔑</span>
+                <input type="password" id="login-password" class="auth-input" placeholder="••••••••" required>
+                <button type="button" class="auth-pw-toggle" tabindex="-1">👁️</button>
+              </div>
+              <div class="auth-inline">
+                <label class="auth-checkbox">
+                  <input type="checkbox" id="login-remember" checked>
+                  Remember me
+                </label>
+                <a class="auth-link" id="show-forgot">Forgot password?</a>
+              </div>
+              <button type="submit" id="login-submit" class="auth-btn-primary">Sign In to Vault</button>
+            </form>
+            <div class="auth-divider">or</div>
+            <button type="button" id="google-login-btn" class="auth-btn-google">
+              <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continue with Google
+            </button>
+            <div class="auth-footer">
+              Don't have an account? <a class="auth-link" id="show-register">Create one &rarr;</a>
+            </div>
+          </div>
+          
+          <!-- Register View -->
+          <div id="auth-register" class="auth-view">
+            <div class="auth-header">
+              <h2>Create your vault</h2>
+              <p>Free forever. No credit card required.</p>
+            </div>
+            <div id="register-alert" class="auth-alert"></div>
+            <form id="register-form">
+              <div class="auth-input-group">
+                <span class="auth-input-icon">👤</span>
+                <input type="text" id="register-name" class="auth-input" placeholder="Full Name" required minlength="2">
+              </div>
+              <div class="auth-input-group">
+                <span class="auth-input-icon">✉️</span>
+                <input type="email" id="register-email" class="auth-input" placeholder="your@email.com" required>
+              </div>
+              <div class="auth-input-group" style="margin-bottom: 24px;">
+                <span class="auth-input-icon">🔑</span>
+                <input type="password" id="register-password" class="auth-input" placeholder="Create password (min 8 chars)" required minlength="8">
+                <button type="button" class="auth-pw-toggle" tabindex="-1">👁️</button>
+              </div>
+              <div class="pw-strength">
+                <div class="pw-strength-bar">
+                  <div class="pw-strength-seg"></div>
+                  <div class="pw-strength-seg"></div>
+                  <div class="pw-strength-seg"></div>
+                  <div class="pw-strength-seg"></div>
+                </div>
+                <div class="pw-strength-label" id="pw-strength-label"></div>
+              </div>
+              <div class="auth-input-group" style="margin-bottom: 24px;">
+                <span class="auth-input-icon">🔑</span>
+                <input type="password" id="register-password-confirm" class="auth-input" placeholder="Confirm password" required>
+              </div>
+              <div id="pw-match-indicator" class="pw-match"></div>
+              <select id="register-currency" class="auth-select">
+                <option value="LKR">LKR - Sri Lankan Rupee</option>
+                <option value="USD">USD - US Dollar</option>
+                <option value="EUR">EUR - Euro</option>
+                <option value="GBP">GBP - British Pound</option>
+                <option value="INR">INR - Indian Rupee</option>
+                <option value="SGD">SGD - Singapore Dollar</option>
+              </select>
+              <label class="auth-checkbox" style="margin-bottom: 20px;">
+                <input type="checkbox" id="register-terms" required>
+                I agree to the Terms of Service and Privacy Policy
+              </label>
+              <button type="submit" id="register-submit" class="auth-btn-primary">Create My Vault</button>
+            </form>
+            <div class="auth-divider">or</div>
+            <button type="button" id="google-register-btn" class="auth-btn-google">
+              <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Sign up with Google
+            </button>
+            <div class="auth-footer">
+              Already have an account? <a class="auth-link" id="show-login">Sign in &rarr;</a>
+            </div>
+          </div>
+          
+          <!-- Confirm Email View -->
+          <div id="auth-confirm" class="auth-view auth-success-screen">
+            <div class="auth-success-icon">✉️</div>
+            <h3>Check your email</h3>
+            <p>We sent a confirmation link to<br><strong id="confirm-email-address" style="color:#E6EDF3"></strong></p>
+            <p style="margin-bottom: 24px;">Click the link to activate your vault.</p>
+            <button id="resend-email-btn" class="auth-resend-btn">Resend Email</button>
+            <div class="auth-footer" style="margin-top: 32px;">
+              <a class="auth-link" id="show-login-2">&larr; Back to sign in</a>
+            </div>
+          </div>
+          
+          <!-- Forgot Password View -->
+          <div id="auth-forgot" class="auth-view">
+            <div class="auth-header">
+              <h2>Reset password</h2>
+              <p>Enter your email to receive a reset link</p>
+            </div>
+            <div id="forgot-alert" class="auth-alert"></div>
+            <form id="forgot-form">
+              <div class="auth-input-group" style="margin-bottom: 24px;">
+                <span class="auth-input-icon">✉️</span>
+                <input type="email" id="forgot-email" class="auth-input" placeholder="your@email.com" required>
+              </div>
+              <button type="submit" id="forgot-submit" class="auth-btn-primary">Send Reset Link</button>
+            </form>
+            <div class="auth-footer">
+              <a class="auth-link" id="back-to-login">&larr; Back to sign in</a>
+            </div>
+          </div>
+          
+          <!-- Reset New Password View (from email link) -->
+          <div id="auth-reset-pw" class="auth-view">
+            <div class="auth-header">
+              <h2>Set new password</h2>
+              <p>Enter your new password below</p>
+            </div>
+            <div id="reset-pw-alert" class="auth-alert"></div>
+            <form id="reset-pw-form">
+              <div class="auth-input-group" style="margin-bottom: 20px;">
+                <span class="auth-input-icon">🔑</span>
+                <input type="password" id="reset-new-password" class="auth-input" placeholder="New password" required minlength="8">
+                <button type="button" class="auth-pw-toggle" tabindex="-1">👁️</button>
+              </div>
+              <div class="auth-input-group" style="margin-bottom: 24px;">
+                <span class="auth-input-icon">🔑</span>
+                <input type="password" id="reset-new-password-confirm" class="auth-input" placeholder="Confirm new password" required minlength="8">
+              </div>
+              <button type="submit" id="reset-pw-submit" class="auth-btn-primary">Update Password</button>
+            </form>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ Loading Screen ════ -->
+  <div id="loading-screen" class="hidden">
+    <div class="brand">Vaultly</div>
+    <div class="loading-bar">
+      <div class="loading-bar-fill"></div>
+    </div>
+    <div id="loading-text">Loading your vault...</div>
+  </div>
+
+  <!-- ════ App Shell ════ -->
+  <div id="app-shell" class="hidden">
+    <!-- Sidebar backdrop -->
   <div class="mobile-overlay" id="mobile-overlay"></div>
 
   <!-- Sidebar -->
@@ -196,6 +392,7 @@
 
   <!-- FAB -->
   <button class="fab" id="add-fab" aria-label="Add transaction">+</button>
+  </div>
 </body>
 
 </html>

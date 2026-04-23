@@ -2,36 +2,19 @@
  * @fileoverview Storage layer — Supabase only.
  */
 
-import { isConfigured, checkSupabaseHealth } from './config/supabase.js';
+import { isConfigured } from './config/supabase.js';
 import { supabaseAdapter } from './adapters/supabase.adapter.js';
 
-let adapterReady = false;
-
-// ─── Adapter selection ────────────────────────────────────────────────────────
-
-async function ensureAdapter() {
-  if (adapterReady) return;
-
-  if (isConfigured() && await checkSupabaseHealth()) {
-    adapterReady = true;
-    console.log('Using Supabase adapter');
-  } else {
-    console.warn('Supabase is not available — data will not be persisted.');
-  }
-}
-
 export function isUsingCloud() {
-  return adapterReady;
+  return isConfigured();
 }
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
-export async function load() {
-  await ensureAdapter();
-
-  if (adapterReady) {
+export async function load(user = null) {
+  if (isConfigured()) {
     try {
-      const data = await supabaseAdapter.load();
+      const data = await supabaseAdapter.load(user);
       if (data) return data;
     } catch (e) {
       console.error('Supabase load failed:', e);
@@ -49,7 +32,7 @@ export async function load() {
  * payload: the record or id
  */
 export async function saveRecord(action, payload) {
-  if (!adapterReady) return;
+  if (!isConfigured()) return;
 
   try {
     switch (action) {
@@ -100,6 +83,7 @@ export async function saveRecord(action, payload) {
     }
   } catch (err) {
     console.error(`Supabase write failed for ${action}:`, err);
+    throw err;
   }
 }
 

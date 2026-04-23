@@ -1,65 +1,47 @@
 /**
- * @fileoverview Supabase storage adapter
+ * @fileoverview Supabase storage adapter using @supabase/supabase-js SDK
  */
 
-import { supabase, isConfigured, getSupabaseHeaders } from '../config/supabase.js';
-
-const TABLES = {
-  fundSources: 'fund_sources',
-  transactions: 'transactions',
-  transfers: 'transfers',
-  budgets: 'budgets',
-  recurringRules: 'recurring_rules',
-  settings: 'user_settings'
-};
-
-function getHeaders() {
-  return getSupabaseHeaders(true);
-}
-
-async function request(method, table, body = null, query = '') {
-  if (!isConfigured()) {
-    throw new Error('Supabase not configured');
-  }
-
-  const url = `${supabase.url}/rest/v1/${table}${query}`;
-  const headers = getHeaders();
-
-  // DELETE requests must not include a body or Prefer: return=representation
-  if (method === 'DELETE') {
-    delete headers['Prefer'];
-  }
-
-  const options = { method, headers };
-
-  if (body && method !== 'DELETE') {
-    options.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(url, options);
-
-  // 204 No Content is a valid success (common for DELETE/PATCH)
-  if (response.status === 204) return null;
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Supabase error: ${response.status} - ${error}`);
-  }
-
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
+import { supabase, getCurrentUser } from '../config/supabase.js';
 
 export const supabaseAdapter = {
-  async load() {
+  async load(userParam = null) {
+    console.log('[Adapter] load() triggered');
     try {
-      const [fundSources, transactions, transfers, budgets, recurringRules] = await Promise.all([
-        request('GET', TABLES.fundSources, null, '?select=*&order=created_at'),
-        request('GET', TABLES.transactions, null, '?select=*&order=date.desc'),
-        request('GET', TABLES.transfers, null, '?select=*&order=date.desc'),
-        request('GET', TABLES.budgets, null, '?select=*&order=created_at'),
-        request('GET', TABLES.recurringRules, null, '?select=*&order=created_at'),
-      ]);
+      let user = userParam;
+      if (!user) {
+        console.log('[Adapter] Awaiting getCurrentUser()...');
+        user = await getCurrentUser();
+      }
+      console.log('[Adapter] User fetched:', user?.id);
+      if (!user) return null;
+
+      console.log('[Adapter] Awaiting fund_sources...');
+      const { data: fundSources, error: fsError } = await supabase.from('fund_sources').select('*').order('created_at');
+      
+      console.log('[Adapter] Awaiting transactions...');
+      const { data: transactions, error: txError } = await supabase.from('transactions').select('*').order('date', { ascending: false });
+      
+      console.log('[Adapter] Awaiting transfers...');
+      const { data: transfers, error: trError } = await supabase.from('transfers').select('*').order('date', { ascending: false });
+      
+      console.log('[Adapter] Awaiting budgets...');
+      const { data: budgets, error: bgError } = await supabase.from('budgets').select('*').order('created_at');
+      
+      console.log('[Adapter] Awaiting recurring_rules...');
+      const { data: recurringRules, error: rrError } = await supabase.from('recurring_rules').select('*').order('created_at');
+      
+      console.log('[Adapter] Awaiting profiles...');
+      const { data: profile, error: prError } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+
+      console.log('[Adapter] All sequential queries resolved successfully');
+
+      if (fsError) throw fsError;
+      if (txError) throw txError;
+      if (trError) throw trError;
+      if (bgError) throw bgError;
+      if (rrError) throw rrError;
+      if (prError) throw prError;
 
       return {
         fundSources: (fundSources || []).map(normalizeFundSource),
@@ -67,7 +49,11 @@ export const supabaseAdapter = {
         transfers: (transfers || []).map(normalizeTransfer),
         budgets: (budgets || []).map(normalizeBudget),
         recurringRules: (recurringRules || []).map(normalizeRecurringRule),
-        settings: null
+        settings: profile ? {
+          currency: profile.currency,
+          dateFormat: profile.date_format,
+          userName: profile.full_name
+        } : null
       };
     } catch (error) {
       console.error('Supabase load error:', error);
@@ -75,86 +61,166 @@ export const supabaseAdapter = {
     }
   },
 
-  async saveFundSource(fundSource) {
-    const dbObj = toDbFundSource(fundSource);
-    if (fundSource.id) {
-      return request('PATCH', TABLES.fundSources, dbObj, `?id=eq.${fundSource.id}`);
-    } else {
-      return request('POST', TABLES.fundSources, dbObj);
-    }
+  // ── Fund Sources ──────────────────────────────────────────────────────────
+  async insertFundSource(fundSource) {
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('fund_sources')
+      .insert({ id: fundSource.id, ...toDbFundSource(fundSource), user_id: user.id })
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateFundSource(fundSource) {
+    const { data, error } = await supabase
+      .from('fund_sources')
+      .update(toDbFundSource(fundSource))
+      .eq('id', fundSource.id)
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async deleteFundSource(id) {
-    return request('DELETE', TABLES.fundSources, null, `?id=eq.${id}`);
+    const { error } = await supabase
+      .from('fund_sources')
+      .update({ is_active: false })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ── Transactions ──────────────────────────────────────────────────────────
   async insertTransaction(transaction) {
-    return request('POST', TABLES.transactions, { id: transaction.id, ...toDbTransaction(transaction) });
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({ id: transaction.id, ...toDbTransaction(transaction), user_id: user.id })
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async updateTransaction(transaction) {
-    return request('PATCH', TABLES.transactions, toDbTransaction(transaction), `?id=eq.${transaction.id}`);
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(toDbTransaction(transaction))
+      .eq('id', transaction.id)
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async deleteTransaction(id) {
-    return request('DELETE', TABLES.transactions, null, `?id=eq.${id}`);
-  },
-
-  // ── Fund Sources ──────────────────────────────────────────────────────────
-  async insertFundSource(fundSource) {
-    return request('POST', TABLES.fundSources, { id: fundSource.id, ...toDbFundSource(fundSource) });
-  },
-
-  async updateFundSource(fundSource) {
-    return request('PATCH', TABLES.fundSources, toDbFundSource(fundSource), `?id=eq.${fundSource.id}`);
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ── Transfers ─────────────────────────────────────────────────────────────
   async insertTransfer(transfer) {
-    return request('POST', TABLES.transfers, { id: transfer.id, ...toDbTransfer(transfer) });
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('transfers')
+      .insert({ id: transfer.id, ...toDbTransfer(transfer), user_id: user.id })
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async deleteTransfer(id) {
-    return request('DELETE', TABLES.transfers, null, `?id=eq.${id}`);
+    const { error } = await supabase
+      .from('transfers')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ── Budgets ───────────────────────────────────────────────────────────────
   async insertBudget(budget) {
-    return request('POST', TABLES.budgets, { id: budget.id, ...toDbBudget(budget) });
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('budgets')
+      .insert({ id: budget.id, ...toDbBudget(budget), user_id: user.id })
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async updateBudget(budget) {
-    return request('PATCH', TABLES.budgets, toDbBudget(budget), `?id=eq.${budget.id}`);
+    const { data, error } = await supabase
+      .from('budgets')
+      .update(toDbBudget(budget))
+      .eq('id', budget.id)
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async deleteBudget(id) {
-    return request('DELETE', TABLES.budgets, null, `?id=eq.${id}`);
+    const { error } = await supabase
+      .from('budgets')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ── Recurring Rules ───────────────────────────────────────────────────────
   async insertRecurringRule(rule) {
-    return request('POST', TABLES.recurringRules, { id: rule.id, ...toDbRecurringRule(rule) });
+    const user = await getCurrentUser();
+    const { data, error } = await supabase
+      .from('recurring_rules')
+      .insert({ id: rule.id, ...toDbRecurringRule(rule), user_id: user.id })
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
   async updateRecurringRule(rule) {
-    return request('PATCH', TABLES.recurringRules, toDbRecurringRule(rule), `?id=eq.${rule.id}`);
+    const { data, error } = await supabase
+      .from('recurring_rules')
+      .update(toDbRecurringRule(rule))
+      .eq('id', rule.id)
+      .select().single();
+    if (error) throw error;
+    return data;
   },
 
-  // ── Settings ──────────────────────────────────────────────────────────────
+  async deleteRecurringRule(id) {
+    const { error } = await supabase
+      .from('recurring_rules')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // ── Settings (Profile) ────────────────────────────────────────────────────
   async saveSettings(settings) {
     try {
-      const dbObj = toDbSettings(settings);
-      return await request('POST', TABLES.settings, dbObj);
+      const user = await getCurrentUser();
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          currency: settings.currency,
+          date_format: settings.dateFormat,
+          full_name: settings.userName
+        })
+        .eq('id', user.id)
+        .select().single();
+      
+      if (error) throw error;
+      return data;
     } catch {
       return null;
     }
-  },
-
-  async subscribe(channel, callback) {
-    return () => {};
   }
 };
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function normalizeFundSource(row) {
   return {
@@ -249,7 +315,7 @@ function toDbFundSource(fs) {
     color: fs.color,
     icon: fs.icon,
     notes: fs.notes || null,
-    is_active: fs.isActive
+    is_active: fs.isActive !== false
   };
 }
 
@@ -299,14 +365,6 @@ function toDbRecurringRule(r) {
     fund_source_id: r.fundSourceId,
     period: r.period,
     next_due_date: r.nextDueDate,
-    is_active: r.isActive
-  };
-}
-
-function toDbSettings(s) {
-  return {
-    currency: s.currency,
-    date_format: s.dateFormat,
-    user_name: s.userName
+    is_active: r.isActive !== false
   };
 }
