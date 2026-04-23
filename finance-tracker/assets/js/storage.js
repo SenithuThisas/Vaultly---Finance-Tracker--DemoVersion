@@ -5,17 +5,118 @@
 import { isConfigured } from './config/supabase.js';
 import { supabaseAdapter } from './adapters/supabase.adapter.js';
 
+const BOOTSTRAP_CACHE_KEY = 'vaultly.bootstrap.cache.v1';
+const CACHED_DATA_TIMEOUT_MS = 20000;
+const LIVE_DATA_TIMEOUT_MS = 12000;
+
 export function isUsingCloud() {
   return isConfigured();
 }
 
+export function getCachedBootstrap(userId = null) {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+
+  try {
+    const raw = window.localStorage.getItem(BOOTSTRAP_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const payload = parsed?.payload;
+    if (!payload) return null;
+
+    if (userId && parsed?.userId && parsed.userId !== userId) {
+      return null;
+    }
+
+    return {
+      ...payload,
+      cacheTimestamp: parsed.cachedAt || null,
+      fromCache: true
+    };
+  } catch (error) {
+    console.warn('Failed to read bootstrap cache:', error);
+    return null;
+  }
+}
+
+function saveBootstrapCache(userId, payload) {
+  if (typeof window === 'undefined' || !window.localStorage || !payload) return;
+
+  try {
+    window.localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({
+      userId: userId || null,
+      cachedAt: Date.now(),
+      payload: {
+        fundSources: payload.fundSources || [],
+        transactions: payload.transactions || [],
+        transfers: payload.transfers || [],
+        budgets: payload.budgets || [],
+        recurringRules: payload.recurringRules || [],
+        settings: payload.settings || null,
+        loadErrors: payload.loadErrors || []
+      }
+    }));
+  } catch (error) {
+    console.warn('Failed to save bootstrap cache:', error);
+  }
+}
+
+function emitCachedProgress(onProgress, cached) {
+  if (!onProgress || !cached) return;
+
+  onProgress({ key: 'fundSources', data: cached.fundSources || [], error: null, source: 'cache' });
+  onProgress({ key: 'transactions', data: cached.transactions || [], error: null, source: 'cache' });
+  onProgress({ key: 'transfers', data: cached.transfers || [], error: null, source: 'cache' });
+  onProgress({ key: 'budgets', data: cached.budgets || [], error: null, source: 'cache' });
+  onProgress({ key: 'recurringRules', data: cached.recurringRules || [], error: null, source: 'cache' });
+  onProgress({ key: 'settings', data: cached.settings || null, error: null, source: 'cache' });
+}
+
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
-export async function load(user = null) {
+export async function load(user = null, options = {}) {
+  const {
+    onProgress,
+    onBackgroundRefresh,
+    backgroundRefresh = true,
+    forceRefresh = false,
+    healthTimeoutMs = 3000
+  } = options;
+
+  const userId = user?.id || null;
+  const cached = forceRefresh ? null : getCachedBootstrap(userId);
+
+  if (cached) {
+    emitCachedProgress(onProgress, cached);
+
+    if (backgroundRefresh && isConfigured()) {
+      supabaseAdapter.load(user, {
+        onProgress,
+        healthTimeoutMs,
+        queryTimeoutMs: LIVE_DATA_TIMEOUT_MS
+      }).then((fresh) => {
+        if (!fresh) return;
+        saveBootstrapCache(userId, fresh);
+        onBackgroundRefresh?.(fresh);
+      }).catch((error) => {
+        console.warn('Background refresh failed:', error);
+      });
+    }
+
+    return cached;
+  }
+
   if (isConfigured()) {
     try {
-      const data = await supabaseAdapter.load(user);
-      if (data) return data;
+      const data = await supabaseAdapter.load(user, {
+        onProgress,
+        healthTimeoutMs,
+        queryTimeoutMs: options.queryTimeoutMs || CACHED_DATA_TIMEOUT_MS
+      });
+      if (data) {
+        saveBootstrapCache(userId, data);
+        return data;
+      }
     } catch (e) {
       console.error('Supabase load failed:', e);
     }
