@@ -26,6 +26,10 @@ function withTimeout(promise, label, timeoutMs = AUTH_TIMEOUT_MS) {
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const DEFAULT_HEADERS = {
+  'Accept': 'application/json',
+  'Content-Type': 'application/json'
+};
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('Supabase credentials not set in .env');
@@ -39,12 +43,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: true         // catches email confirm + password reset redirects
   },
   global: {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
+    headers: DEFAULT_HEADERS
   }
 });
+
+export { SUPABASE_URL };
 
 /** Check if Supabase is configured */
 export function isConfigured() {
