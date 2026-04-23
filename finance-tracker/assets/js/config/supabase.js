@@ -4,8 +4,32 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+const AUTH_TIMEOUT_MS = 8000;
+
+function withTimeout(promise, label, timeoutMs = AUTH_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const DEFAULT_HEADERS = {
+  'Accept': 'application/json',
+  'Content-Type': 'application/json'
+};
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('Supabase credentials not set in .env');
@@ -17,8 +41,13 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true         // catches email confirm + password reset redirects
+  },
+  global: {
+    headers: DEFAULT_HEADERS
   }
 });
+
+export { SUPABASE_URL };
 
 /** Check if Supabase is configured */
 export function isConfigured() {
@@ -110,8 +139,16 @@ export async function getCurrentUser() {
  * Get the current session
  */
 export async function getSession() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session;
+  try {
+    const { data: { session } } = await withTimeout(
+      supabase.auth.getSession(),
+      'auth.getSession'
+    );
+    return session;
+  } catch (error) {
+    console.warn('getSession failed, continuing as signed out:', error?.message || error);
+    return null;
+  }
 }
 
 /**

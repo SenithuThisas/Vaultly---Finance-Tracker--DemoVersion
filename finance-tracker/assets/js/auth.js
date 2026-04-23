@@ -4,10 +4,39 @@
 
 import {
   supabase, signUp, signIn, signInWithGoogle,
-  signOut, resetPassword, updatePassword, getSession, getCurrentUser
+  signOut, resetPassword, updatePassword, getSession, getCurrentUser, SUPABASE_URL
 } from './config/supabase.js';
 
 let _onAuthReady = null; // callback when user is authenticated
+let _authReadyInFlight = null;
+let _authReadyUserId = null;
+let _authReadyCompletedUserId = null;
+
+async function runAuthReadyOnce(user, reason) {
+  if (!user?.id) return;
+
+  if (_authReadyCompletedUserId === user.id) {
+    console.log(`[Auth] Skipping duplicate auth bootstrap for ${reason}`);
+    return;
+  }
+
+  if (_authReadyInFlight && _authReadyUserId === user.id) {
+    console.log(`[Auth] Reusing in-flight auth bootstrap for ${reason}`);
+    return _authReadyInFlight;
+  }
+
+  _authReadyUserId = user.id;
+  _authReadyInFlight = (async () => {
+    await _onAuthReady(user);
+  })();
+
+  try {
+    await _authReadyInFlight;
+    _authReadyCompletedUserId = user.id;
+  } finally {
+    _authReadyInFlight = null;
+  }
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -25,9 +54,15 @@ export async function initAuth(onAuthenticated) {
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       showLoading();
-      await _onAuthReady(session.user);
+      try {
+        await runAuthReadyOnce(session.user, 'SIGNED_IN');
+      } catch (error) {
+        console.error('Auth ready callback failed after SIGNED_IN:', error);
+        showAuth();
+      }
     }
     if (event === 'SIGNED_OUT') {
+      _authReadyCompletedUserId = null;
       showAuth();
     }
     if (event === 'PASSWORD_RECOVERY') {
@@ -37,10 +72,28 @@ export async function initAuth(onAuthenticated) {
   });
 
   // Check existing session
-  const session = await getSession();
+  let session = null;
+  try {
+    session = await getSession();
+  } catch (error) {
+    console.error('Session restore check failed:', error);
+  }
+
+  if (!session) {
+    session = getCachedSession();
+    if (session?.user) {
+      console.warn('Recovered session from localStorage cache after getSession fallback.');
+    }
+  }
+
   if (session) {
     showLoading();
-    await _onAuthReady(session.user);
+    try {
+      await runAuthReadyOnce(session.user, 'session restore');
+    } catch (error) {
+      console.error('Auth ready callback failed during session restore:', error);
+      showAuth();
+    }
   } else {
     hideLoading();
     showAuth();
@@ -356,7 +409,7 @@ export async function getUserProfile(providedUser = null) {
   const user = providedUser || await getCurrentUser();
   if (!user) return null;
 
-  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
   return {
     id: user.id,
     email: user.email,
@@ -366,4 +419,48 @@ export async function getUserProfile(providedUser = null) {
     dateFormat: data?.date_format || 'DD/MM/YYYY',
     createdAt: user.created_at
   };
+}
+
+function getCachedSession() {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+
+  try {
+    const explicitProjectRef = (SUPABASE_URL || '').match(/https:\/\/([^.]+)/)?.[1];
+    const preferredKey = explicitProjectRef ? `sb-${explicitProjectRef}-auth-token` : null;
+    const candidateKeys = [];
+
+    if (preferredKey) candidateKeys.push(preferredKey);
+    candidateKeys.push(
+      ...Object.keys(window.localStorage).filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+    );
+
+    for (const key of candidateKeys) {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+
+      const parsed = JSON.parse(raw);
+      const session = normalizeCachedSession(parsed);
+      if (!session || !session.user) continue;
+
+      if (session.expires_at && Date.now() >= session.expires_at * 1000) {
+        continue;
+      }
+
+      return session;
+    }
+  } catch (error) {
+    console.warn('Failed to parse cached Supabase session:', error);
+  }
+
+  return null;
+}
+
+function normalizeCachedSession(value) {
+  if (!value) return null;
+  if (value.currentSession) return value.currentSession;
+  if (Array.isArray(value)) {
+    return value.find((entry) => entry?.access_token && entry?.user) || value[0] || null;
+  }
+  if (value.access_token && value.user) return value;
+  return null;
 }

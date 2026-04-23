@@ -4,8 +4,109 @@
 
 import { supabase, getCurrentUser } from '../config/supabase.js';
 
+const QUERY_TIMEOUT_MS = 12000;
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+const HEALTH_TIMEOUT_MS = 3000;
+const QUERY_CONCURRENCY = 2;
+
+let activeLoad = null;
+
+function emitProgress(listeners, payload) {
+  listeners.forEach((listener) => {
+    try {
+      listener?.(payload);
+    } catch (error) {
+      console.warn('[Adapter] onProgress listener failed:', error);
+    }
+  });
+}
+
+function withTimeout(promise, label, timeoutMs = QUERY_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetry(queryFactory, label, retryDelaysMs = RETRY_DELAYS_MS) {
+  return withRetryAndTimeout(queryFactory, label, retryDelaysMs, QUERY_TIMEOUT_MS);
+}
+
+async function withRetryAndTimeout(queryFactory, label, retryDelaysMs = RETRY_DELAYS_MS, timeoutMs = QUERY_TIMEOUT_MS) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      return await withTimeout(queryFactory(), label, timeoutMs);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retryDelaysMs.length) break;
+
+      const delayMs = retryDelaysMs[attempt];
+      console.warn(`[Adapter] ${label} failed (attempt ${attempt + 1}), retrying in ${delayMs}ms`, error);
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+async function runWithConcurrency(taskFactories, limit = QUERY_CONCURRENCY) {
+  const results = new Array(taskFactories.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < taskFactories.length) {
+      const index = cursor;
+      cursor += 1;
+
+      try {
+        const value = await taskFactories[index]();
+        results[index] = { status: 'fulfilled', value };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  }
+
+  const workerCount = Math.min(limit, taskFactories.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 export const supabaseAdapter = {
-  async load(userParam = null) {
+  async load(userParam = null, options = {}) {
+    const {
+      onProgress,
+      queryTimeoutMs = QUERY_TIMEOUT_MS,
+      healthTimeoutMs = HEALTH_TIMEOUT_MS
+    } = options;
+
+    if (activeLoad) {
+      if (onProgress) activeLoad.listeners.add(onProgress);
+      console.log('[Adapter] load() deduped - returning in-flight promise');
+      return activeLoad.promise;
+    }
+
+    const listeners = new Set();
+    if (onProgress) listeners.add(onProgress);
+
+    const loadPromise = (async () => {
     console.log('[Adapter] load() triggered');
     try {
       let user = userParam;
@@ -16,49 +117,116 @@ export const supabaseAdapter = {
       console.log('[Adapter] User fetched:', user?.id);
       if (!user) return null;
 
-      console.log('[Adapter] Awaiting fund_sources...');
-      const { data: fundSources, error: fsError } = await supabase.from('fund_sources').select('*').order('created_at');
-      
-      console.log('[Adapter] Awaiting transactions...');
-      const { data: transactions, error: txError } = await supabase.from('transactions').select('*').order('date', { ascending: false });
-      
-      console.log('[Adapter] Awaiting transfers...');
-      const { data: transfers, error: trError } = await supabase.from('transfers').select('*').order('date', { ascending: false });
-      
-      console.log('[Adapter] Awaiting budgets...');
-      const { data: budgets, error: bgError } = await supabase.from('budgets').select('*').order('created_at');
-      
-      console.log('[Adapter] Awaiting recurring_rules...');
-      const { data: recurringRules, error: rrError } = await supabase.from('recurring_rules').select('*').order('created_at');
-      
-      console.log('[Adapter] Awaiting profiles...');
-      const { data: profile, error: prError } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      await withTimeout(
+        supabase.from('profiles').select('id').eq('id', user.id).limit(1),
+        'connection health check',
+        healthTimeoutMs
+      ).catch((error) => {
+        throw new Error(`Connection issue: ${error.message}`);
+      });
 
-      console.log('[Adapter] All sequential queries resolved successfully');
+      const queries = [
+        {
+          key: 'fundSources',
+          label: 'fund_sources query',
+          run: () => supabase.from('fund_sources').select('*').order('created_at'),
+          normalize: (rows) => (rows || []).map(normalizeFundSource)
+        },
+        {
+          key: 'transactions',
+          label: 'transactions query',
+          run: () => supabase.from('transactions').select('*').order('date', { ascending: false }),
+          normalize: (rows) => (rows || []).map(normalizeTransaction)
+        },
+        {
+          key: 'transfers',
+          label: 'transfers query',
+          run: () => supabase.from('transfers').select('*').order('date', { ascending: false }),
+          normalize: (rows) => (rows || []).map(normalizeTransfer)
+        },
+        {
+          key: 'budgets',
+          label: 'budgets query',
+          run: () => supabase.from('budgets').select('*').order('created_at'),
+          normalize: (rows) => (rows || []).map(normalizeBudget)
+        },
+        {
+          key: 'recurringRules',
+          label: 'recurring_rules query',
+          run: () => supabase.from('recurring_rules').select('*').order('created_at'),
+          normalize: (rows) => (rows || []).map(normalizeRecurringRule)
+        },
+        {
+          key: 'settings',
+          label: 'profiles query',
+          run: () => supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+          normalize: (profile) => profile
+            ? {
+                currency: profile.currency,
+                dateFormat: profile.date_format,
+                userName: profile.full_name
+              }
+            : null
+        }
+      ];
 
-      if (fsError) throw fsError;
-      if (txError) throw txError;
-      if (trError) throw trError;
-      if (bgError) throw bgError;
-      if (rrError) throw rrError;
-      if (prError) throw prError;
+      const taskFactories = queries.map((q) => async () => {
+        const result = await withRetryAndTimeout(q.run, q.label, RETRY_DELAYS_MS, queryTimeoutMs);
+        if (result.error) {
+          emitProgress(listeners, { key: q.key, error: result.error });
+          return result;
+        }
+
+        emitProgress(listeners, { key: q.key, data: q.normalize(result.data), error: null });
+        return result;
+      });
+
+      const settled = await runWithConcurrency(taskFactories, QUERY_CONCURRENCY);
+      const loaded = {
+        fundSources: [],
+        transactions: [],
+        transfers: [],
+        budgets: [],
+        recurringRules: [],
+        settings: null
+      };
+      const errors = [];
+
+      settled.forEach((result, index) => {
+        const query = queries[index];
+
+        if (result.status === 'rejected') {
+          errors.push({ key: query.key, error: result.reason });
+          return;
+        }
+
+        const { data, error } = result.value;
+        if (error) {
+          errors.push({ key: query.key, error });
+          return;
+        }
+
+        loaded[query.key] = query.normalize(data);
+      });
+
+      if (errors.length > 0) {
+        console.warn('[Adapter] Bootstrap completed with partial failures:', errors);
+      }
 
       return {
-        fundSources: (fundSources || []).map(normalizeFundSource),
-        transactions: (transactions || []).map(normalizeTransaction),
-        transfers: (transfers || []).map(normalizeTransfer),
-        budgets: (budgets || []).map(normalizeBudget),
-        recurringRules: (recurringRules || []).map(normalizeRecurringRule),
-        settings: profile ? {
-          currency: profile.currency,
-          dateFormat: profile.date_format,
-          userName: profile.full_name
-        } : null
+        ...loaded,
+        loadErrors: errors
       };
     } catch (error) {
       console.error('Supabase load error:', error);
       throw error;
     }
+    })().finally(() => {
+      activeLoad = null;
+    });
+
+    activeLoad = { promise: loadPromise, listeners };
+    return loadPromise;
   },
 
   // ── Fund Sources ──────────────────────────────────────────────────────────
