@@ -3,8 +3,9 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinFlow - Personal Finance Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Vaultly - Personal Finance Tracker</title>
+  <meta name="description" content="Track your finances, budgets, and investments with Vaultly — a modern personal finance dashboard.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -14,88 +15,103 @@
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/components.css">
   <link rel="stylesheet" href="assets/css/charts.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
   <script type="module" src="assets/js/app.js"></script>
 </head>
 
 <body>
-  <div class="app-container">
-    <button class="hamburger" id="hamburger">☰</button>
-    <div class="mobile-overlay" id="mobile-overlay"></div>
+  <!-- Sidebar backdrop -->
+  <div class="mobile-overlay" id="mobile-overlay"></div>
 
-    <aside class="sidebar" id="sidebar">
-      <div class="logo">
-        <h1>Vaulty</h1>
-        <span>Finance Tracker</span>
-      </div>
-      <nav class="nav">
-        <a class="nav-link" data-view="dashboard">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="9" rx="1" />
-            <rect x="14" y="3" width="7" height="5" rx="1" />
-            <rect x="14" y="12" width="7" height="9" rx="1" />
-            <rect x="3" y="16" width="7" height="5" rx="1" />
-          </svg>
-          Dashboard
-        </a>
-        <a class="nav-link" data-view="banks">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="4" width="20" height="16" rx="2" />
-            <path d="M12 4v16" />
-          </svg>
-          Bank Accounts
-        </a>
-        <a class="nav-link" data-view="transactions">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-          Transactions
-        </a>
-        <a class="nav-link" data-view="transfers">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 3l4 4-4 4" />
-            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-            <path d="M7 21l-4-4 4-4" />
-            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-          </svg>
-          Transfers
-        </a>
-        <a class="nav-link" data-view="budgets">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
-            <path d="M12 3v18" />
-          </svg>
-          Budgets
-        </a>
-        <a class="nav-link" data-view="analytics">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 3v18h18" />
-            <path d="M18 17V9" />
-            <path d="M13 17V5" />
-            <path d="M8 17v-3" />
-          </svg>
-          Analytics
-        </a>
-      </nav>
-      <div class="sidebar-footer">
-        <button class="nav-link" id="settings-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-          Settings
-        </button>
-      </div>
-    </aside>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">
+      <h1>Vaultly</h1>
+      <span>Finance Tracker</span>
+    </div>
+    <nav class="nav">
+      <a class="nav-link" data-view="dashboard" data-tooltip="Dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="9" rx="1" />
+          <rect x="14" y="3" width="7" height="5" rx="1" />
+          <rect x="14" y="12" width="7" height="9" rx="1" />
+          <rect x="3" y="16" width="7" height="5" rx="1" />
+        </svg>
+        <span class="nav-link-text">Dashboard</span>
+      </a>
+      <a class="nav-link" data-view="banks" data-tooltip="Accounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M12 4v16" />
+        </svg>
+        <span class="nav-link-text">Bank Accounts</span>
+      </a>
+      <a class="nav-link" data-view="transactions" data-tooltip="Transactions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+        <span class="nav-link-text">Transactions</span>
+      </a>
+      <a class="nav-link" data-view="transfers" data-tooltip="Transfers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 3l4 4-4 4" />
+          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+          <path d="M7 21l-4-4 4-4" />
+          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        </svg>
+        <span class="nav-link-text">Transfers</span>
+      </a>
+      <a class="nav-link" data-view="budgets" data-tooltip="Budgets">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
+          <path d="M12 3v18" />
+        </svg>
+        <span class="nav-link-text">Budgets</span>
+      </a>
+      <a class="nav-link" data-view="analytics" data-tooltip="Analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3v18h18" />
+          <path d="M18 17V9" />
+          <path d="M13 17V5" />
+          <path d="M8 17v-3" />
+        </svg>
+        <span class="nav-link-text">Analytics</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-link" id="settings-btn" data-tooltip="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+        <span class="nav-link-text">Settings</span>
+      </button>
+    </div>
+  </aside>
 
-    <main class="main">
-      <div class="top-bar">
-        <div class="breadcrumb" id="breadcrumb">Dashboard</div>
-        <div class="top-actions">
-          <button class="btn btn-icon" id="search-btn" title="Search (Ctrl+K)">🔍</button>
-          <button class="btn btn-icon" id="export-btn" title="Export CSV">📤</button>
-        </div>
+  <!-- Main content wrapper -->
+  <div class="main-wrapper">
+    <!-- Mobile top bar (visible only <768px) -->
+    <header class="mobile-top-bar" id="mobile-top-bar">
+      <button class="hamburger" id="hamburger" aria-label="Open menu">☰</button>
+      <span class="logo-text">Vaultly</span>
+      <div class="top-actions-mobile">
+        <button class="btn-icon" id="mobile-search-btn" title="Search" aria-label="Search">🔍</button>
       </div>
+    </header>
+
+    <!-- Desktop top bar (visible only ≥768px) -->
+    <header class="top-bar" id="top-bar">
+      <div class="breadcrumb" id="breadcrumb">Dashboard</div>
+      <div class="top-actions">
+        <button class="btn btn-icon" id="search-btn" title="Search (Ctrl+K)">🔍</button>
+        <button class="btn btn-icon" id="export-btn" title="Export CSV">📤</button>
+      </div>
+    </header>
+
+    <!-- Views -->
+    <main class="main-content">
       <section id="view-dashboard" class="view"></section>
       <section id="view-banks" class="view"></section>
       <section id="view-transactions" class="view"></section>
@@ -105,6 +121,42 @@
     </main>
   </div>
 
+  <!-- Bottom Tab Bar (mobile) -->
+  <nav class="bottom-tab-bar" id="bottom-tab-bar">
+    <button class="tab-item active" data-view="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" />
+        <rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" />
+      </svg>
+      Home
+    </button>
+    <button class="tab-item" data-view="banks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M12 4v16" />
+      </svg>
+      Accounts
+    </button>
+    <button class="tab-item" data-view="transactions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+      </svg>
+      Transactions
+    </button>
+    <button class="tab-item" data-view="budgets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /><path d="M12 3v18" />
+      </svg>
+      Budgets
+    </button>
+    <button class="tab-item" data-view="analytics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+      </svg>
+      Analytics
+    </button>
+  </nav>
+
+  <!-- Modal -->
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
       <div class="modal-header">
@@ -119,8 +171,10 @@
     </div>
   </div>
 
+  <!-- Drawer -->
   <div class="drawer-overlay" id="drawer-overlay"></div>
   <div class="drawer" id="tx-drawer">
+    <div class="drawer-drag-handle"></div>
     <div class="drawer-header">
       <h3 class="drawer-title" id="drawer-title">Add Transaction</h3>
       <button class="drawer-close" id="drawer-close">×</button>
@@ -129,8 +183,10 @@
     <div class="drawer-footer" id="drawer-footer"></div>
   </div>
 
+  <!-- Toast -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Search -->
   <div class="search-overlay" id="search-overlay">
     <div class="search-box">
       <input type="text" class="search-input" id="search-input" placeholder="Search transactions, accounts...">
@@ -138,7 +194,8 @@
     </div>
   </div>
 
-  <button class="fab" id="add-fab">+</button>
+  <!-- FAB -->
+  <button class="fab" id="add-fab" aria-label="Add transaction">+</button>
 </body>
 
 </html>
