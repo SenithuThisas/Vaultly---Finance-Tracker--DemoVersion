@@ -66,12 +66,15 @@ export const BudgetService = {
     const daysInMonth = monthEnd.getDate();
     const daysLeft = daysInMonth - now.getDate();
 
+    const monthTxs = state.transactions.filter(tx => 
+      tx.type === 'DR' && 
+      new Date(tx.date) >= monthStart && 
+      new Date(tx.date) <= monthEnd
+    );
+
     return state.budgets.map(budget => {
-      const txs = state.transactions.filter(tx =>
+      const txs = monthTxs.filter(tx =>
         tx.category === budget.category &&
-        tx.type === 'DR' &&
-        new Date(tx.date) >= monthStart &&
-        new Date(tx.date) <= monthEnd &&
         (!budget.fundSourceId || tx.fundSourceId === budget.fundSourceId)
       );
 
