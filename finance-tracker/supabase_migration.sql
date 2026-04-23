@@ -1,54 +1,67 @@
 -- =============================================================================
--- Vaultly Finance Tracker - Supabase Schema Fix Migration
+-- Vaultly - RLS Fix
 -- Run this in: Supabase Dashboard > SQL Editor > New Query
+-- This enables anon read/write on all 5 tables (no auth required)
 -- =============================================================================
 
--- 1. Add missing soft-delete columns to existing tables
--- (These are safe to run — they're no-ops if the column already exists)
+-- Enable RLS on all tables (safe to re-run)
+ALTER TABLE fund_sources    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transfers       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE budgets         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recurring_rules ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE fund_sources    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE transactions    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE transfers       ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE budgets         ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE recurring_rules ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+-- Drop old policies if they exist (to avoid duplicates)
+DROP POLICY IF EXISTS "Allow anon read fund_sources"         ON fund_sources;
+DROP POLICY IF EXISTS "Allow anon insert fund_sources"       ON fund_sources;
+DROP POLICY IF EXISTS "Allow anon update fund_sources"       ON fund_sources;
+DROP POLICY IF EXISTS "Allow anon delete fund_sources"       ON fund_sources;
 
--- 2. Create the user_settings table if it doesn't exist
+DROP POLICY IF EXISTS "Allow anon read transactions"         ON transactions;
+DROP POLICY IF EXISTS "Allow anon insert transactions"       ON transactions;
+DROP POLICY IF EXISTS "Allow anon update transactions"       ON transactions;
+DROP POLICY IF EXISTS "Allow anon delete transactions"       ON transactions;
 
-CREATE TABLE IF NOT EXISTS user_settings (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  currency    TEXT    NOT NULL DEFAULT 'USD',
-  date_format TEXT    NOT NULL DEFAULT 'YYYY-MM-DD',
-  user_name   TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+DROP POLICY IF EXISTS "Allow anon read transfers"            ON transfers;
+DROP POLICY IF EXISTS "Allow anon insert transfers"          ON transfers;
+DROP POLICY IF EXISTS "Allow anon update transfers"          ON transfers;
+DROP POLICY IF EXISTS "Allow anon delete transfers"          ON transfers;
 
--- 3. Enable Row Level Security on user_settings (to match other tables)
-ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon read budgets"              ON budgets;
+DROP POLICY IF EXISTS "Allow anon insert budgets"            ON budgets;
+DROP POLICY IF EXISTS "Allow anon update budgets"            ON budgets;
+DROP POLICY IF EXISTS "Allow anon delete budgets"            ON budgets;
 
--- 4. RLS policies so the anon key can read/write
--- (Skip if you have auth set up and want user-scoped access)
+DROP POLICY IF EXISTS "Allow anon read recurring_rules"      ON recurring_rules;
+DROP POLICY IF EXISTS "Allow anon insert recurring_rules"    ON recurring_rules;
+DROP POLICY IF EXISTS "Allow anon update recurring_rules"    ON recurring_rules;
+DROP POLICY IF EXISTS "Allow anon delete recurring_rules"    ON recurring_rules;
 
-CREATE POLICY IF NOT EXISTS "Allow anon read fund_sources"    ON fund_sources    FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Allow anon insert fund_sources"  ON fund_sources    FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow anon update fund_sources"  ON fund_sources    FOR UPDATE USING (true);
+-- Re-create policies allowing full anon access (SELECT / INSERT / UPDATE / DELETE)
+CREATE POLICY "Allow anon read fund_sources"         ON fund_sources    FOR SELECT USING (true);
+CREATE POLICY "Allow anon insert fund_sources"       ON fund_sources    FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update fund_sources"       ON fund_sources    FOR UPDATE USING (true);
+CREATE POLICY "Allow anon delete fund_sources"       ON fund_sources    FOR DELETE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Allow anon read transactions"    ON transactions    FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Allow anon insert transactions"  ON transactions    FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow anon update transactions"  ON transactions    FOR UPDATE USING (true);
+CREATE POLICY "Allow anon read transactions"         ON transactions    FOR SELECT USING (true);
+CREATE POLICY "Allow anon insert transactions"       ON transactions    FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update transactions"       ON transactions    FOR UPDATE USING (true);
+CREATE POLICY "Allow anon delete transactions"       ON transactions    FOR DELETE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Allow anon read transfers"       ON transfers       FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Allow anon insert transfers"     ON transfers       FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow anon update transfers"     ON transfers       FOR UPDATE USING (true);
+CREATE POLICY "Allow anon read transfers"            ON transfers       FOR SELECT USING (true);
+CREATE POLICY "Allow anon insert transfers"          ON transfers       FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update transfers"          ON transfers       FOR UPDATE USING (true);
+CREATE POLICY "Allow anon delete transfers"          ON transfers       FOR DELETE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Allow anon read budgets"         ON budgets         FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Allow anon insert budgets"       ON budgets         FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow anon update budgets"       ON budgets         FOR UPDATE USING (true);
+CREATE POLICY "Allow anon read budgets"              ON budgets         FOR SELECT USING (true);
+CREATE POLICY "Allow anon insert budgets"            ON budgets         FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update budgets"            ON budgets         FOR UPDATE USING (true);
+CREATE POLICY "Allow anon delete budgets"            ON budgets         FOR DELETE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Allow anon read recurring_rules" ON recurring_rules FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Allow anon insert recurring_rules" ON recurring_rules FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow anon update recurring_rules" ON recurring_rules FOR UPDATE USING (true);
+CREATE POLICY "Allow anon read recurring_rules"      ON recurring_rules FOR SELECT USING (true);
+CREATE POLICY "Allow anon insert recurring_rules"    ON recurring_rules FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anon update recurring_rules"    ON recurring_rules FOR UPDATE USING (true);
+CREATE POLICY "Allow anon delete recurring_rules"    ON recurring_rules FOR DELETE USING (true);
 
-CREATE POLICY IF NOT EXISTS "Allow anon read user_settings"   ON user_settings   FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Allow anon insert user_settings" ON user_settings   FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Allow anon update user_settings" ON user_settings   FOR UPDATE USING (true);
+-- Done ✅
+-- All 5 tables now allow full anon access (SELECT, INSERT, UPDATE, DELETE)
