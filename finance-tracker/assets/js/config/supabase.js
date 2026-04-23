@@ -1,90 +1,128 @@
 /**
- * @fileoverview Supabase client configuration
+ * @fileoverview Supabase client (SDK) + auth helper functions
  */
 
-const env = import.meta.env;
+import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
-const SUPABASE_PUBLISHABLE_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
-const SUPABASE_API_KEY = SUPABASE_ANON_KEY || SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-if (!SUPABASE_URL || !SUPABASE_API_KEY) {
-  if (import.meta.env.DEV) console.warn('Supabase not configured...');
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('Supabase credentials not set in .env');
 }
 
-const supabaseUrl = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/, '') : '';
-let authRejected = false;
-let healthCheckPromise = null;
-let cachedHealthResult = null;
+/** Supabase client instance */
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true         // catches email confirm + password reset redirects
+  }
+});
 
-function isJwtLikeKey(key) {
-  return typeof key === 'string' && key.split('.').length === 3;
+/** Check if Supabase is configured */
+export function isConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
-export function getSupabaseHeaders(withJsonContentType = false) {
-  const headers = {
-    'apikey': SUPABASE_API_KEY
-  };
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
 
-  // Publishable keys (sb_publishable_*) are not JWTs, so skip Bearer for those.
-  if (isJwtLikeKey(SUPABASE_API_KEY)) {
-    headers.Authorization = `Bearer ${SUPABASE_API_KEY}`;
+/**
+ * Sign up a new user with email/password
+ */
+export async function signUp(email, password, fullName, currency = 'LKR') {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: fullName }        // goes to raw_user_meta_data
+    }
+  });
+  if (error) throw error;
+
+  // Update profile with currency preference (trigger already created the row)
+  if (data.user) {
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      full_name: fullName,
+      currency
+    });
   }
 
-  if (withJsonContentType) {
-    headers['Content-Type'] = 'application/json';
-    headers.Prefer = 'return=representation';
-  }
-
-  return headers;
+  return data;
 }
 
-export const supabase = {
-  url: supabaseUrl,
-  anonKey: SUPABASE_API_KEY
-};
+/**
+ * Sign in with email + password
+ */
+export async function signIn(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+}
 
+/**
+ * Google OAuth sign in
+ */
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+  if (error) throw error;
+}
+
+/**
+ * Sign out
+ */
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+/**
+ * Send password reset email
+ */
+export async function resetPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}?type=recovery`
+  });
+  if (error) throw error;
+}
+
+/**
+ * Update password (when user has a valid session, e.g. from reset link)
+ */
+export async function updatePassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
+/**
+ * Get the current user synchronously from cache, or null
+ */
+export async function getCurrentUser() {
+  const session = await getSession();
+  return session?.user || null;
+}
+
+/**
+ * Get the current session
+ */
+export async function getSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session;
+}
+
+/**
+ * Health check (lightweight)
+ */
 export async function checkSupabaseHealth() {
-  if (cachedHealthResult !== null) {
-    return cachedHealthResult;
-  }
-
-  if (!isConfigured() || authRejected) {
-    cachedHealthResult = false;
+  if (!isConfigured()) return false;
+  try {
+    const session = await getSession();
+    return Boolean(session);
+  } catch {
     return false;
   }
-
-  if (healthCheckPromise) {
-    return healthCheckPromise;
-  }
-
-  healthCheckPromise = (async () => {
-    try {
-      // The /rest/v1/ root endpoint requires elevated privileges and returns 401 for anon keys.
-      // Query an actual table with limit=0 — returns 200 even with RLS active.
-      const response = await fetch(`${supabaseUrl}/rest/v1/fund_sources?select=id&limit=0`, {
-        method: 'GET',
-        headers: getSupabaseHeaders()
-      });
-      if (response.status === 401 || response.status === 403) {
-        authRejected = true;
-      }
-      // 200 means connected; also accept 406 (table exists but header mismatch)
-      cachedHealthResult = response.ok || response.status === 406;
-      return cachedHealthResult;
-    } catch (error) {
-      console.error('Supabase health check failed:', error);
-      cachedHealthResult = false;
-      return false;
-    } finally {
-      healthCheckPromise = null;
-    }
-  })();
-
-  return healthCheckPromise;
-}
-
-export function isConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_API_KEY);
 }
