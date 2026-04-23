@@ -4,7 +4,7 @@
 
 import { setState, navigateTo, getState, clearState } from './state.js';
 import { load, saveRecord, exportAllCSV, exportJSON, importJSON, readFile, isUsingCloud } from './storage.js';
-import { initAuth, getUserProfile, showApp, hideLoading, handleSignOut } from './auth.js';
+import { initAuth, showApp, handleSignOut } from './auth.js';
 import { RecurringService } from './services/recurring.service.js';
 import { initNav, updateBadges } from './components/nav.js';
 import { initModal, closeModal } from './components/modal.js';
@@ -29,6 +29,7 @@ const VIEWS = {
 };
 
 const APP_BOOT_TIMEOUT_MS = 15000;
+let shellInitialized = false;
 
 function withTimeout(promise, label, timeoutMs = APP_BOOT_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
@@ -52,90 +53,166 @@ function withTimeout(promise, label, timeoutMs = APP_BOOT_TIMEOUT_MS) {
  * Initialize the application (called by Auth when session is ready)
  */
 async function loadAndRenderApp(user) {
+  const baseState = buildBootstrapState(user);
+  setState(baseState);
+  initializeShell(baseState);
+  renderBootstrapSkeleton();
+
   try {
-    // Load saved state from Supabase
-    let state = await withTimeout(load(user), 'storage.load');
-
-    // Check Profile info
-    let profile = null;
-    try {
-      profile = await withTimeout(getUserProfile(user), 'auth.getUserProfile', 8000);
-    } catch (profileError) {
-      console.warn('Profile bootstrap failed, continuing with fallback profile:', profileError?.message || profileError);
-    }
-
-    if (!state || !state.transactions) {
-      state = {
-        fundSources: [],
-        transactions: [],
-        transfers: [],
-        budgets: [],
-        recurringRules: [],
-        currentView: 'dashboard',
-        filters: {},
-        settings: {
-          currency: profile?.currency || 'LKR',
-          dateFormat: profile?.dateFormat || 'DD/MM/YYYY',
-          userName: profile?.fullName || user?.user_metadata?.full_name || 'User',
-          email: profile?.email || user?.email || ''
+    const loaded = await withTimeout(
+      load(user, {
+        onProgress: (chunk) => applyBootstrapChunk(chunk, user),
+        onBackgroundRefresh: (fresh) => {
+          applyLoadedState(fresh, user);
+          if (fresh.loadErrors?.length) {
+            showToast(`Background refresh completed with ${fresh.loadErrors.length} issue(s).`, 'warning', 4000);
+          }
         }
-      };
-    } else if (profile) {
-      // Ensure settings are synced with profile
-      if (!state.settings) state.settings = {};
-      state.settings.userName = profile.fullName;
-      state.settings.currency = profile.currency;
-      state.settings.dateFormat = profile.dateFormat;
-      state.settings.email = profile.email;
+      }),
+      'storage.load',
+      25000
+    );
+
+    if (!loaded) return;
+    applyLoadedState(loaded, user);
+
+    if (loaded.loadErrors?.length) {
+      showToast(`Loaded with ${loaded.loadErrors.length} partial data issue(s).`, 'warning', 5000);
     }
 
-    setState(state);
+  } catch (err) {
+    console.error('Failed to load app data:', err);
 
-    // Render User Profile in Sidebar Footer
-    renderUserProfile(state.settings);
+    if (err?.message?.startsWith('Connection issue:')) {
+      showToast('Connection issue detected. Showing last known data if available.', 'error', 5000);
+      rerenderActiveView();
+      return;
+    }
 
-    // Initialize components
+    const isTimeout = Boolean(err?.message && err.message.includes('timed out'));
+    showToast(
+      isTimeout
+        ? 'Initial data load timed out. Showing cached/partial data.'
+        : 'Failed to finish loading data. Showing what is available.',
+      'warning'
+    );
+
+    rerenderActiveView();
+  }
+}
+
+function buildBootstrapState(user) {
+  return {
+    fundSources: [],
+    transactions: [],
+    transfers: [],
+    budgets: [],
+    recurringRules: [],
+    currentView: 'dashboard',
+    filters: {},
+    settings: {
+      currency: 'LKR',
+      dateFormat: 'DD/MM/YYYY',
+      userName: user?.user_metadata?.full_name || 'User',
+      email: user?.email || ''
+    }
+  };
+}
+
+function initializeShell(state) {
+  if (!shellInitialized) {
     initModal();
     initDrawer();
     initNav();
-
-    // Mobile responsive setup
     setupMobileViewport();
-
-    // Register handlers
     registerKeyboardShortcuts();
     registerGlobalSearch();
     registerFAB();
     registerExportButton();
     registerSettings();
     registerSignOutBtn();
-
-    // Check recurring due
-    RecurringService.checkDue();
-    updateBadges();
-
-    // Reveal App Shell
-    showApp();
-    navigateTo('dashboard');
-
-  } catch (err) {
-    console.error('Failed to load app data:', err);
-
-    // Always break out of the loader if bootstrap fails.
-    hideLoading();
-    const auth = document.getElementById('auth-wrapper');
-    const shell = document.getElementById('app-shell');
-    auth?.classList.remove('hidden');
-    shell?.classList.add('hidden');
-
-    const isTimeout = err?.message && err.message.includes('timed out');
-    showToast(
-      isTimeout
-        ? 'Session restore timed out. Please sign in again.'
-        : 'Failed to load application data. Please sign in again.',
-      'warning'
-    );
+    shellInitialized = true;
   }
+
+  showApp();
+  renderUserProfile(state.settings);
+  navigateTo(state.currentView || 'dashboard');
+}
+
+function renderBootstrapSkeleton() {
+  const container = document.getElementById('view-dashboard');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="view-header">
+      <h2 class="view-title">Dashboard</h2>
+    </div>
+    <div class="card" style="padding: 20px; margin-bottom: 20px; opacity: 0.85;">Loading account balances...</div>
+    <div class="card" style="padding: 20px; margin-bottom: 20px; opacity: 0.75;">Loading transactions...</div>
+    <div class="card" style="padding: 20px; opacity: 0.65;">Loading budgets and analytics...</div>
+  `;
+}
+
+function applyBootstrapChunk(chunk, user) {
+  if (!chunk) return;
+
+  if (chunk.error) {
+    console.warn(`[Bootstrap] ${chunk.key} failed:`, chunk.error);
+    return;
+  }
+
+  const current = getState();
+  const next = {
+    ...current,
+    settings: { ...current.settings }
+  };
+
+  if (chunk.key === 'fundSources') next.fundSources = chunk.data || [];
+  if (chunk.key === 'transactions') next.transactions = chunk.data || [];
+  if (chunk.key === 'transfers') next.transfers = chunk.data || [];
+  if (chunk.key === 'budgets') next.budgets = chunk.data || [];
+  if (chunk.key === 'recurringRules') next.recurringRules = chunk.data || [];
+  if (chunk.key === 'settings' && chunk.data) {
+    next.settings = {
+      ...next.settings,
+      ...chunk.data,
+      email: next.settings.email || user?.email || ''
+    };
+  }
+
+  setState(next);
+  renderUserProfile(next.settings);
+  updateBadges();
+  rerenderActiveView();
+}
+
+function applyLoadedState(loaded, user) {
+  const current = getState();
+  const next = {
+    ...current,
+    fundSources: loaded.fundSources || current.fundSources,
+    transactions: loaded.transactions || current.transactions,
+    transfers: loaded.transfers || current.transfers,
+    budgets: loaded.budgets || current.budgets,
+    recurringRules: loaded.recurringRules || current.recurringRules,
+    settings: {
+      ...current.settings,
+      ...(loaded.settings || {}),
+      email: current.settings.email || user?.email || ''
+    }
+  };
+
+  setState(next);
+  renderUserProfile(next.settings);
+  RecurringService.checkDue();
+  updateBadges();
+  rerenderActiveView();
+}
+
+function rerenderActiveView() {
+  const currentView = getState().currentView || 'dashboard';
+  const render = VIEWS[currentView];
+  if (render) render();
 }
 
 /**
