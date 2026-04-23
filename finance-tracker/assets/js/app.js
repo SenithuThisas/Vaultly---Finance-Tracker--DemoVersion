@@ -28,16 +28,41 @@ const VIEWS = {
   analytics: renderAnalytics
 };
 
+const APP_BOOT_TIMEOUT_MS = 15000;
+
+function withTimeout(promise, label, timeoutMs = APP_BOOT_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 /**
  * Initialize the application (called by Auth when session is ready)
  */
 async function loadAndRenderApp(user) {
   try {
     // Load saved state from Supabase
-    let state = await load(user);
+    let state = await withTimeout(load(user), 'storage.load');
 
     // Check Profile info
-    const profile = await getUserProfile(user);
+    let profile = null;
+    try {
+      profile = await withTimeout(getUserProfile(user), 'auth.getUserProfile', 8000);
+    } catch (profileError) {
+      console.warn('Profile bootstrap failed, continuing with fallback profile:', profileError?.message || profileError);
+    }
 
     if (!state || !state.transactions) {
       state = {
@@ -95,24 +120,21 @@ async function loadAndRenderApp(user) {
 
   } catch (err) {
     console.error('Failed to load app data:', err);
-    
-    // If it's a timeout, the session token is likely corrupted and deadlocking the SDK.
-    if (err.message && err.message.includes('timed out')) {
-      window.alert('Your session appears to be stuck. We are automatically signing you out to fix this.');
-      localStorage.clear(); // Complete nuclear clear
-      window.location.reload();
-      return;
-    }
 
-    window.alert('CRITICAL DATA LOAD ERROR:\n' + err.message + '\n\n' + err.stack);
-    
-    // Fallback UI rendering
-    const text = document.getElementById('loading-text');
-    if (text) {
-      text.style.color = '#F85149';
-      text.textContent = 'Data error: ' + (err.stack || err.message);
-    }
-    showToast('Failed to load application data', 'error');
+    // Always break out of the loader if bootstrap fails.
+    hideLoading();
+    const auth = document.getElementById('auth-wrapper');
+    const shell = document.getElementById('app-shell');
+    auth?.classList.remove('hidden');
+    shell?.classList.add('hidden');
+
+    const isTimeout = err?.message && err.message.includes('timed out');
+    showToast(
+      isTimeout
+        ? 'Session restore timed out. Please sign in again.'
+        : 'Failed to load application data. Please sign in again.',
+      'warning'
+    );
   }
 }
 
