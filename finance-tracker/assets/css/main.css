@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
+  /* ── Colors ─────────────────────────────────── */
   --bg-base: #0F0F0F;
   --bg-card: #1A1A1A;
   --bg-hover: #242424;
@@ -14,19 +15,75 @@
   --text-dim: #555555;
   --border: #2A2A2A;
   --border-subtle: #333333;
-  --sidebar-width: 260px;
+
+  /* ── Layout (mobile-first) ──────────────────── */
+  --sidebar-width: 0px;
+  --sidebar-icon-width: 70px;
+  --sidebar-full-width: 260px;
   --topbar-height: 56px;
+  --bottombar-height: 60px;
+
+  /* ── Spacing (mobile-first) ─────────────────── */
+  --page-padding: 16px;
+  --card-padding: 16px;
+  --section-gap: 20px;
+  --grid-gap: 12px;
+
+  /* ── Radii ──────────────────────────────────── */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+
+  /* ── Shadows ────────────────────────────────── */
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
   --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* ── Transitions ────────────────────────────── */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
+
+  /* ── Fonts ──────────────────────────────────── */
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+  /* ── Fluid Typography ──────────────────────── */
+  --fs-app-title: clamp(1.2rem, 4vw, 1.8rem);
+  --fs-section: clamp(1.1rem, 3vw, 1.5rem);
+  --fs-card-label: clamp(0.7rem, 2vw, 0.85rem);
+  --fs-balance: clamp(1.4rem, 5vw, 2.5rem);
+  --fs-hero-balance: clamp(2rem, 8vw, 4rem);
+  --fs-body: clamp(0.8rem, 2vw, 0.95rem);
+  --fs-table: clamp(0.75rem, 1.8vw, 0.875rem);
+  --fs-btn: clamp(0.8rem, 2vw, 0.9rem);
+  --fs-toast: clamp(0.8rem, 2vw, 0.875rem);
+
+  /* ── iOS viewport fix ──────────────────────── */
+  --vh: 1vh;
 }
 
+/* ── Tablet spacing ─────────────────────────── */
+@media (min-width: 768px) {
+  :root {
+    --sidebar-width: var(--sidebar-icon-width);
+    --page-padding: 24px;
+    --card-padding: 20px;
+    --section-gap: 28px;
+    --grid-gap: 16px;
+  }
+}
+
+/* ── Desktop spacing ────────────────────────── */
+@media (min-width: 1024px) {
+  :root {
+    --sidebar-width: var(--sidebar-full-width);
+    --page-padding: 32px;
+    --card-padding: 24px;
+    --section-gap: 36px;
+    --grid-gap: 20px;
+  }
+}
+
+/* ── Reset ───────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -46,8 +103,10 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   line-height: 1.5;
+  overscroll-behavior-y: none;
 }
 
 body::before {
@@ -63,58 +122,34 @@ body::before {
   z-index: 0;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* ── Scrollbar ──────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--accent-gold); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #d4a53a; }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-base);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--accent-gold);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #d4a53a;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
+/* ── Base element resets ────────────────────── */
+a { color: inherit; text-decoration: none; }
 
 button {
   font-family: inherit;
   cursor: pointer;
   border: none;
   background: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-input,
-select,
-textarea {
+input, select, textarea {
   font-family: inherit;
   font-size: inherit;
 }
 
-img {
-  max-width: 100%;
-  display: block;
-}
+img { max-width: 100%; display: block; }
+ul, ol { list-style: none; }
+h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.3; }
 
-ul,
-ol {
-  list-style: none;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  line-height: 1.3;
-}
-
+/* ── Animations ─────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -130,6 +165,11 @@ h1, h2, h3, h4, h5, h6 {
   to { transform: translateX(0); }
 }
 
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 @keyframes scaleIn {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -143,4 +183,13 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* ── Reduced Motion ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

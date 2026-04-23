@@ -1,0 +1,104 @@
+/* ══════════════════════════════════════════════
+   RESPONSIVE UTILITIES & FIXES
+   ══════════════════════════════════════════════ */
+
+/* ── Touch Interaction ─────────────────────── */
+.nav-link,
+.tab-item,
+.btn,
+.fab,
+.hamburger,
+.btn-icon,
+.color-swatch,
+.search-result-item {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent text selection on UI chrome */
+.sidebar,
+.bottom-tab-bar,
+.mobile-top-bar,
+.nav-link,
+.tab-item {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Scroll Fixes ──────────────────────────── */
+.modal-body,
+.drawer-body,
+.search-results {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ── Mobile-specific visibility helpers ────── */
+.desktop-only { display: none; }
+.mobile-only { display: initial; }
+
+@media (min-width: 768px) {
+  .desktop-only { display: initial; }
+  .mobile-only { display: none; }
+}
+
+/* ── Safe scrollable areas ─────────────────── */
+.table-container,
+.heatmap-grid {
+  scrollbar-width: thin;
+}
+
+/* ── Hide scrollbar but keep scroll on mobile ─ */
+@media (max-width: 767px) {
+  .fund-source-strip {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-snap-type: x mandatory;
+    display: flex;
+    gap: 12px;
+    padding-bottom: 4px;
+  }
+
+  .fund-source-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .fund-source-strip > * {
+    flex-shrink: 0;
+    min-width: 160px;
+    scroll-snap-align: start;
+  }
+
+  /* Charts grid stacks on mobile */
+  .chart-container.grid.grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Tablet chart grid ─────────────────────── */
+@media (min-width: 768px) {
+  .chart-container.grid.grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── iOS input zoom prevention ─────────────── */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Performance ───────────────────────────── */
+.sidebar,
+.drawer,
+.modal {
+  will-change: transform;
+}
+
+/* Remove will-change after transition settles */
+.sidebar:not(.open),
+.drawer:not(.open) {
+  will-change: auto;
+}
