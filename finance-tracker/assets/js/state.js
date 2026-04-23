@@ -3,6 +3,7 @@
  */
 
 import { saveRecord } from './storage.js';
+import { showToast } from './components/toast.js';
 
 /** @type {import('./types').AppState} */
 let AppState = {
@@ -109,7 +110,10 @@ export function dispatch(action, payload) {
   }
 
   // Write the specific record to Supabase immediately
-  saveRecord(action, payload).catch(err => console.error('saveRecord error:', err));
+  saveRecord(action, payload).catch(err => {
+    console.error('saveRecord error:', err);
+    showToast('Failed to save data. Please check your connection.', 'error');
+  });
 
   // Re-render current view
   const currentView = AppState.currentView;
@@ -159,5 +163,30 @@ function updateBreadcrumb(viewName) {
       analytics: 'Analytics'
     };
     breadcrumb.textContent = names[viewName] || viewName;
+  }
+}
+
+/**
+ * Clear the entire state (used on sign out)
+ */
+export function clearState() {
+  AppState = {
+    fundSources: [],
+    transactions: [],
+    transfers: [],
+    budgets: [],
+    recurringRules: [],
+    currentView: 'dashboard',
+    filters: {},
+    settings: {
+      currency: 'LKR',
+      dateFormat: 'DD/MM/YYYY',
+      userName: 'User'
+    }
+  };
+
+  const currentView = AppState.currentView;
+  if (viewRenderers[currentView]) {
+    viewRenderers[currentView]();
   }
 }
