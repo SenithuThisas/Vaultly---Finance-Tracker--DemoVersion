@@ -1,158 +1,109 @@
 /**
- * @fileoverview Storage layer with Supabase + localStorage fallback
+ * @fileoverview Storage layer — Supabase only.
  */
 
-import { STORAGE_KEY, getState, setState } from './state.js';
 import { isConfigured, checkSupabaseHealth } from './config/supabase.js';
 import { supabaseAdapter } from './adapters/supabase.adapter.js';
-import { localStorageAdapter } from './adapters/localStorage.adapter.js';
 
-let adapter = null;
-let pendingQueue = [];
-let isOnline = navigator.onLine;
-let isSyncing = false;
+let adapterReady = false;
 
-async function selectAdapter() {
+// ─── Adapter selection ────────────────────────────────────────────────────────
+
+async function ensureAdapter() {
+  if (adapterReady) return;
+
   if (isConfigured() && await checkSupabaseHealth()) {
-    adapter = supabaseAdapter;
+    adapterReady = true;
     console.log('Using Supabase adapter');
   } else {
-    adapter = localStorageAdapter;
-    console.log('Using localStorage adapter (Supabase unavailable)');
+    console.warn('Supabase is not available — data will not be persisted.');
   }
-  return adapter;
 }
 
-function getAdapter() {
-  return adapter || supabaseAdapter;
+export function isUsingCloud() {
+  return adapterReady;
 }
 
-window.addEventListener('online', async () => {
-  isOnline = true;
-  await flushPendingQueue();
-});
+// ─── Load ─────────────────────────────────────────────────────────────────────
 
-window.addEventListener('offline', () => {
-  isOnline = false;
-  adapter = localStorageAdapter;
-});
+export async function load() {
+  await ensureAdapter();
 
-export function save(state) {
-  // Always persist to localStorage as a backup cache
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    if (e.name === 'QuotaExceededError') {
-      console.warn('Storage quota exceeded');
-    }
-  }
-
-  if (!isOnline) {
-    pendingQueue.push({ type: 'full_save', data: state, timestamp: Date.now() });
-    return;
-  }
-
-  if (adapter === localStorageAdapter) {
-    return;
-  }
-
-  syncToCloud(state).catch(err => console.error('Sync error:', err));
-}
-
-async function syncToCloud(state) {
-  if (!state) return;
-
-  const promises = [];
-
-  for (const fs of (state.fundSources || [])) {
-    if (fs._dirty || fs._new) {
-      promises.push(supabaseAdapter.saveFundSource(fs).then(() => { fs._dirty = false; fs._new = false; }));
-    }
-  }
-
-  for (const tx of (state.transactions || [])) {
-    if (tx._dirty || tx._new) {
-      promises.push(supabaseAdapter.saveTransaction(tx).then(() => { tx._dirty = false; tx._new = false; }));
-    }
-  }
-
-  for (const t of (state.transfers || [])) {
-    if (t._dirty || t._new) {
-      promises.push(supabaseAdapter.saveTransfer(t).then(() => { t._dirty = false; t._new = false; }));
-    }
-  }
-
-  for (const b of (state.budgets || [])) {
-    if (b._dirty || b._new) {
-      promises.push(supabaseAdapter.saveBudget(b).then(() => { b._dirty = false; b._new = false; }));
-    }
-  }
-
-  await Promise.allSettled(promises);
-}
-
-async function load() {
-  await selectAdapter();
-
-  try {
-    const data = await getAdapter().load();
-    if (data) {
-      return data;
-    }
-  } catch (e) {
-    console.error('Load error, falling back to localStorage:', e);
-  }
-
-  const localData = localStorage.getItem(STORAGE_KEY);
-  return localData ? JSON.parse(localData) : null;
-}
-
-export { load };
-
-export function clear() {
-  localStorage.removeItem(STORAGE_KEY);
-  pendingQueue = [];
-}
-
-async function flushPendingQueue() {
-  if (isSyncing || pendingQueue.length === 0) return;
-  isSyncing = true;
-
-  while (pendingQueue.length > 0) {
-    const item = pendingQueue.shift();
+  if (adapterReady) {
     try {
-      if (item.type === 'full_save') {
-        await syncToCloud(item.data);
-      }
+      const data = await supabaseAdapter.load();
+      if (data) return data;
     } catch (e) {
-      console.error('Queue flush error:', e);
-      pendingQueue.unshift(item);
-      break;
+      console.error('Supabase load failed:', e);
     }
   }
 
-  isSyncing = false;
+  return null;
 }
 
-export function queueFundSource(fundSource) {
-  pendingQueue.push({ type: 'fund_source', data: fundSource });
-  if (isOnline) flushPendingQueue();
+// ─── Per-record saves (called by dispatch in state.js) ────────────────────────
+
+/**
+ * Save a single record to Supabase.
+ * action: the dispatch action string
+ * payload: the record or id
+ */
+export async function saveRecord(action, payload) {
+  if (!adapterReady) return;
+
+  try {
+    switch (action) {
+      case 'ADD_FUND_SOURCE':
+        await supabaseAdapter.insertFundSource(payload);
+        break;
+      case 'EDIT_FUND_SOURCE':
+        await supabaseAdapter.updateFundSource(payload);
+        break;
+      case 'DELETE_FUND_SOURCE':
+        await supabaseAdapter.deleteFundSource(payload);
+        break;
+      case 'ADD_TRANSACTION':
+        await supabaseAdapter.insertTransaction(payload);
+        break;
+      case 'EDIT_TRANSACTION':
+        await supabaseAdapter.updateTransaction(payload);
+        break;
+      case 'DELETE_TRANSACTION':
+        await supabaseAdapter.deleteTransaction(payload);
+        break;
+      case 'ADD_TRANSFER':
+        await supabaseAdapter.insertTransfer(payload);
+        break;
+      case 'DELETE_TRANSFER':
+        await supabaseAdapter.deleteTransfer(payload);
+        break;
+      case 'ADD_BUDGET':
+        await supabaseAdapter.insertBudget(payload);
+        break;
+      case 'EDIT_BUDGET':
+        await supabaseAdapter.updateBudget(payload);
+        break;
+      case 'DELETE_BUDGET':
+        await supabaseAdapter.deleteBudget(payload);
+        break;
+      case 'ADD_RECURRING_RULE':
+        await supabaseAdapter.insertRecurringRule(payload);
+        break;
+      case 'EDIT_RECURRING_RULE':
+        await supabaseAdapter.updateRecurringRule(payload);
+        break;
+      case 'UPDATE_SETTINGS':
+        await supabaseAdapter.saveSettings(payload);
+        break;
+      default:
+        break;
+    }
+  } catch (err) {
+    console.error(`Supabase write failed for ${action}:`, err);
+  }
 }
 
-export function queueTransaction(transaction) {
-  pendingQueue.push({ type: 'transaction', data: transaction });
-  if (isOnline) flushPendingQueue();
-}
-
-export function queueTransfer(transfer) {
-  pendingQueue.push({ type: 'transfer', data: transfer });
-  if (isOnline) flushPendingQueue();
-}
-
-export function queueBudget(budget) {
-  pendingQueue.push({ type: 'budget', data: budget });
-  if (isOnline) flushPendingQueue();
-}
+// ─── Misc utils ───────────────────────────────────────────────────────────────
 
 export function exportAllCSV(transactions, fundSources) {
   const headers = ['Date', 'Title', 'Category', 'Type', 'Amount', 'Fund Source', 'Reference', 'Note', 'Tags'];
@@ -172,7 +123,7 @@ export function exportAllCSV(transactions, fundSources) {
   });
 
   const csv = [headers.join(','), ...rows].join('\n');
-  downloadFile(csv, `vaultly-export-${getDateString()}.csv`, 'text/csv');
+  _downloadFile(csv, `vaultly-export-${_dateString()}.csv`, 'text/csv');
 }
 
 export function exportAccountCSV(fundSource, transactions) {
@@ -196,12 +147,11 @@ export function exportAccountCSV(fundSource, transactions) {
     });
 
   const csv = [headers.join(','), ...rows].join('\n');
-  downloadFile(csv, `${fundSource.name}-ledger-${getDateString()}.csv`, 'text/csv');
+  _downloadFile(csv, `${fundSource.name}-ledger-${_dateString()}.csv`, 'text/csv');
 }
 
 export function exportJSON(state) {
-  const json = JSON.stringify(state, null, 2);
-  downloadFile(json, `vaultly-backup-${getDateString()}.json`, 'application/json');
+  _downloadFile(JSON.stringify(state, null, 2), `vaultly-backup-${_dateString()}.json`, 'application/json');
 }
 
 export function importJSON(jsonString) {
@@ -210,28 +160,10 @@ export function importJSON(jsonString) {
     if (!data.transactions && !data.fundSources) {
       throw new Error('Invalid data format');
     }
-    setState(data);
-    save(data);
     return data;
   } catch (e) {
     return e;
   }
-}
-
-function downloadFile(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function getDateString() {
-  return new Date().toISOString().split('T')[0];
 }
 
 export function readFile(file) {
@@ -243,10 +175,18 @@ export function readFile(file) {
   });
 }
 
-export function isUsingCloud() {
-  return adapter === supabaseAdapter;
+function _downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
-export function isUsingOffline() {
-  return adapter === localStorageAdapter;
+function _dateString() {
+  return new Date().toISOString().split('T')[0];
 }

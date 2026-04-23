@@ -1,5 +1,5 @@
 /**
- * @fileoverview Navigation component
+ * @fileoverview Navigation component — handles sidebar, bottom tab bar, mobile nav
  */
 
 import { navigateTo } from '../state.js';
@@ -13,19 +13,35 @@ export function initNav() {
   const navLinks = document.querySelectorAll('.nav-link[data-view]');
   const hamburger = document.getElementById('hamburger');
   const mobileOverlay = document.getElementById('mobile-overlay');
+  const bottomTabBar = document.getElementById('bottom-tab-bar');
+  const mobileSearchBtn = document.getElementById('mobile-search-btn');
 
-  // Nav click handlers
+  // Sidebar nav click handlers
   navLinks.forEach(link => {
     link.addEventListener('click', () => {
       const view = link.dataset.view;
       if (view) {
         navigateTo(view);
         closeMobileNav();
+        updateBottomTabBar(view);
       }
     });
   });
 
-  // Mobile nav
+  // Bottom tab bar click handlers
+  if (bottomTabBar) {
+    bottomTabBar.querySelectorAll('.tab-item').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const view = tab.dataset.view;
+        if (view) {
+          navigateTo(view);
+          updateBottomTabBar(view);
+        }
+      });
+    });
+  }
+
+  // Mobile hamburger
   if (hamburger) {
     hamburger.addEventListener('click', () => {
       document.getElementById('sidebar')?.classList.toggle('open');
@@ -33,8 +49,20 @@ export function initNav() {
     });
   }
 
+  // Mobile overlay (close sidebar)
   if (mobileOverlay) {
     mobileOverlay.addEventListener('click', closeMobileNav);
+  }
+
+  // Mobile search button — triggers same search as desktop
+  if (mobileSearchBtn) {
+    mobileSearchBtn.addEventListener('click', () => {
+      const searchOverlay = document.getElementById('search-overlay');
+      if (searchOverlay) {
+        searchOverlay.classList.add('open');
+        document.getElementById('search-input')?.focus();
+      }
+    });
   }
 
   // Update notification badges
@@ -50,13 +78,24 @@ function closeMobileNav() {
 }
 
 /**
- * Set active view in navigation
+ * Update bottom tab bar active state
+ * @param {string} viewName
+ */
+function updateBottomTabBar(viewName) {
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.view === viewName);
+  });
+}
+
+/**
+ * Set active view in navigation (sidebar + bottom tabs)
  * @param {string} viewName
  */
 export function setActiveView(viewName) {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.view === viewName);
   });
+  updateBottomTabBar(viewName);
 }
 
 /**

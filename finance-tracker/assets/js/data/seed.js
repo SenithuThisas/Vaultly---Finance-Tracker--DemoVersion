@@ -48,16 +48,23 @@ export const CURRENCIES = [
   { code: 'AUD', label: 'Australian Dollar', symbol: 'A$' }
 ];
 
-const uuid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
-
 /**
- * Generate seed data for first-time users
+ * Generate seed data for first-time users.
+ * All IDs are proper UUIDs so they are compatible with Supabase.
  * @returns {{fundSources: Array, transactions: Array, transfers: Array, budgets: Array, recurringRules: Array}}
  */
 export function getSeedData() {
+  // Use stable UUIDs so re-generating seed twice doesn't create duplicates
+  const FS1 = crypto.randomUUID();
+  const FS2 = crypto.randomUUID();
+  const FS3 = crypto.randomUUID();
+  const FS4 = crypto.randomUUID();
+
+  const now = new Date();
+
   const fundSources = [
     {
-      id: 'fs-1',
+      id: FS1,
       name: 'Commercial Bank',
       type: 'bank',
       bankName: 'Commercial Bank Ceylon',
@@ -72,7 +79,7 @@ export function getSeedData() {
       isActive: true
     },
     {
-      id: 'fs-2',
+      id: FS2,
       name: 'HNB Savings',
       type: 'bank',
       bankName: 'Hatton National Bank',
@@ -87,7 +94,7 @@ export function getSeedData() {
       isActive: true
     },
     {
-      id: 'fs-3',
+      id: FS3,
       name: 'Cash on Hand',
       type: 'cash',
       bankName: null,
@@ -102,7 +109,7 @@ export function getSeedData() {
       isActive: true
     },
     {
-      id: 'fs-4',
+      id: FS4,
       name: 'Credit Card',
       type: 'credit_card',
       bankName: 'HSBC',
@@ -117,9 +124,6 @@ export function getSeedData() {
       isActive: true
     }
   ];
-
-  const transactions = [];
-  const now = new Date();
 
   const txTemplates = [
     { title: 'Monthly Salary', amount: 425000, category: 'salary', type: 'CR' },
@@ -177,8 +181,9 @@ export function getSeedData() {
     { title: 'Taxi Ride', amount: 1800, category: 'transport', type: 'DR' }
   ];
 
-  // Generate transactions spanning last 3 months
+  const transactions = [];
   let txIndex = 0;
+
   for (let monthOffset = 2; monthOffset >= 0; monthOffset--) {
     const monthDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
     const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
@@ -191,13 +196,13 @@ export function getSeedData() {
 
       let fundSourceId;
       if (template.type === 'CR') {
-        fundSourceId = template.category === 'salary' ? 'fs-1' : 'fs-2';
+        fundSourceId = template.category === 'salary' ? FS1 : FS2;
       } else {
-        fundSourceId = template.category === 'shopping' ? 'fs-4' : 'fs-1';
+        fundSourceId = template.category === 'shopping' ? FS4 : FS1;
       }
 
       transactions.push({
-        id: uuid(),
+        id: crypto.randomUUID(),
         title: template.title,
         amount: template.amount,
         type: template.type,
@@ -218,9 +223,9 @@ export function getSeedData() {
 
   const transfers = [
     {
-      id: uuid(),
-      fromFundSourceId: 'fs-1',
-      toFundSourceId: 'fs-2',
+      id: crypto.randomUUID(),
+      fromFundSourceId: FS1,
+      toFundSourceId: FS2,
       amount: 50000,
       date: new Date(now.getFullYear(), now.getMonth() - 1, 15).toISOString().split('T')[0],
       note: 'Monthly savings transfer',
@@ -228,9 +233,9 @@ export function getSeedData() {
       createdAt: new Date().toISOString()
     },
     {
-      id: uuid(),
-      fromFundSourceId: 'fs-2',
-      toFundSourceId: 'fs-3',
+      id: crypto.randomUUID(),
+      fromFundSourceId: FS2,
+      toFundSourceId: FS3,
       amount: 10000,
       date: new Date(now.getFullYear(), now.getMonth(), 5).toISOString().split('T')[0],
       note: 'Weekly cash allowance',
@@ -238,9 +243,9 @@ export function getSeedData() {
       createdAt: new Date().toISOString()
     },
     {
-      id: uuid(),
-      fromFundSourceId: 'fs-1',
-      toFundSourceId: 'fs-4',
+      id: crypto.randomUUID(),
+      fromFundSourceId: FS1,
+      toFundSourceId: FS4,
       amount: 25000,
       date: new Date(now.getFullYear(), now.getMonth() - 2, 20).toISOString().split('T')[0],
       note: 'Credit card payment',
@@ -250,55 +255,55 @@ export function getSeedData() {
   ];
 
   const budgets = [
-    { id: 'bud-1', category: 'food', limit: 100000, period: 'monthly', fundSourceId: null, color: '#F59E0B', createdAt: now.toISOString() },
-    { id: 'bud-2', category: 'transport', limit: 50000, period: 'monthly', fundSourceId: null, color: '#8B5CF6', createdAt: now.toISOString() },
-    { id: 'bud-3', category: 'entertainment', limit: 25000, period: 'monthly', fundSourceId: null, color: '#EC4899', createdAt: now.toISOString() },
-    { id: 'bud-4', category: 'shopping', limit: 75000, period: 'monthly', fundSourceId: null, color: '#F87171', createdAt: now.toISOString() },
-    { id: 'bud-5', category: 'utilities', limit: 45000, period: 'monthly', fundSourceId: null, color: '#FCD34D', createdAt: now.toISOString() },
-    { id: 'bud-6', category: 'housing', limit: 200000, period: 'monthly', fundSourceId: null, color: '#60A5FA', createdAt: now.toISOString() }
+    { id: crypto.randomUUID(), category: 'food', limit: 100000, period: 'monthly', fundSourceId: null, color: '#F59E0B', createdAt: now.toISOString() },
+    { id: crypto.randomUUID(), category: 'transport', limit: 50000, period: 'monthly', fundSourceId: null, color: '#8B5CF6', createdAt: now.toISOString() },
+    { id: crypto.randomUUID(), category: 'entertainment', limit: 25000, period: 'monthly', fundSourceId: null, color: '#EC4899', createdAt: now.toISOString() },
+    { id: crypto.randomUUID(), category: 'shopping', limit: 75000, period: 'monthly', fundSourceId: null, color: '#F87171', createdAt: now.toISOString() },
+    { id: crypto.randomUUID(), category: 'utilities', limit: 45000, period: 'monthly', fundSourceId: null, color: '#FCD34D', createdAt: now.toISOString() },
+    { id: crypto.randomUUID(), category: 'housing', limit: 200000, period: 'monthly', fundSourceId: null, color: '#60A5FA', createdAt: now.toISOString() }
   ];
 
   const recurringRules = [
     {
-      id: 'rec-1',
+      id: crypto.randomUUID(),
       title: 'Monthly Rent',
       amount: 185000,
       type: 'DR',
       category: 'housing',
-      fundSourceId: 'fs-1',
+      fundSourceId: FS1,
       period: 'monthly',
       nextDueDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0],
       isActive: true
     },
     {
-      id: 'rec-2',
+      id: crypto.randomUUID(),
       title: 'Monthly Salary',
       amount: 425000,
       type: 'CR',
       category: 'salary',
-      fundSourceId: 'fs-1',
+      fundSourceId: FS1,
       period: 'monthly',
       nextDueDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0],
       isActive: true
     },
     {
-      id: 'rec-3',
+      id: crypto.randomUUID(),
       title: 'Netflix Subscription',
       amount: 2499,
       type: 'DR',
       category: 'subscriptions',
-      fundSourceId: 'fs-4',
+      fundSourceId: FS4,
       period: 'monthly',
       nextDueDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5).toISOString().split('T')[0],
       isActive: true
     },
     {
-      id: 'rec-4',
+      id: crypto.randomUUID(),
       title: 'Gym Membership',
       amount: 5500,
       type: 'DR',
       category: 'healthcare',
-      fundSourceId: 'fs-1',
+      fundSourceId: FS1,
       period: 'monthly',
       nextDueDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3).toISOString().split('T')[0],
       isActive: true

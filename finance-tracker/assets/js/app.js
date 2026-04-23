@@ -3,7 +3,7 @@
  */
 
 import { setState, navigateTo, getState } from './state.js';
-import { load, save, exportAllCSV, exportJSON, importJSON, readFile, isUsingCloud } from './storage.js';
+import { load, saveRecord, exportAllCSV, exportJSON, importJSON, readFile, isUsingCloud } from './storage.js';
 import { checkSupabaseHealth, isConfigured } from './config/supabase.js';
 import { getSeedData } from './data/seed.js';
 import { RecurringService } from './services/recurring.service.js';
@@ -53,7 +53,9 @@ async function init() {
         userName: 'User'
       }
     };
-    save(state);
+
+    // Push seed records to Supabase in the background
+    seedToSupabase(seed);
   }
 
   setState(state);
@@ -62,6 +64,9 @@ async function init() {
   initModal();
   initDrawer();
   initNav();
+
+  // Mobile responsive setup
+  setupMobileViewport();
 
   // Register keyboard shortcuts
   registerKeyboardShortcuts();
@@ -87,6 +92,62 @@ async function init() {
 
   // Navigate to dashboard
   navigateTo('dashboard');
+}
+
+/**
+ * Bulk-insert seed data into Supabase on first run.
+ * Runs in the background — UI is already populated from local state.
+ */
+async function seedToSupabase(seed) {
+  for (const fs of seed.fundSources) {
+    await saveRecord('ADD_FUND_SOURCE', fs);
+  }
+  for (const tx of seed.transactions) {
+    await saveRecord('ADD_TRANSACTION', tx);
+  }
+  for (const t of seed.transfers) {
+    await saveRecord('ADD_TRANSFER', t);
+  }
+  for (const b of seed.budgets) {
+    await saveRecord('ADD_BUDGET', b);
+  }
+  for (const r of seed.recurringRules) {
+    await saveRecord('ADD_RECURRING_RULE', r);
+  }
+  console.log('Seed data pushed to Supabase.');
+}
+
+/**
+ * Mobile viewport setup — fixes iOS 100vh and handles virtual keyboard.
+ */
+function setupMobileViewport() {
+  // Fix iOS 100vh bug: set --vh custom property
+  function setVh() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', vh + 'px');
+  }
+  setVh();
+
+  // Debounced resize handler
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(setVh, 150);
+  });
+
+  // Handle virtual keyboard on mobile
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      const keyboardHeight = window.innerHeight - window.visualViewport.height;
+      document.documentElement.style.setProperty('--keyboard-height', keyboardHeight + 'px');
+
+      // Adjust bottom-sheet drawers when keyboard is open
+      const drawer = document.getElementById('tx-drawer');
+      if (drawer && drawer.classList.contains('open')) {
+        drawer.style.paddingBottom = (keyboardHeight > 0 ? keyboardHeight : 0) + 'px';
+      }
+    });
+  }
 }
 
 async function checkConnectionStatus() {
@@ -392,6 +453,7 @@ function showSettingsModal() {
         document.getElementById('import-error').textContent = result.message;
         document.getElementById('import-error').style.display = 'block';
       } else {
+        setState(result);
         showToast('Data imported successfully', 'success');
         closeModal();
         location.reload();
@@ -405,7 +467,6 @@ function showSettingsModal() {
   document.getElementById('reset-data-btn')?.addEventListener('click', () => {
     const confirmReset = confirm('Are you sure you want to reset all data? This action cannot be undone.');
     if (confirmReset) {
-      localStorage.removeItem('finflow_v3');
       location.reload();
     }
   });

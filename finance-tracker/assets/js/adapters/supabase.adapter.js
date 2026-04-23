@@ -88,60 +88,65 @@ export const supabaseAdapter = {
     return request('DELETE', TABLES.fundSources, null, `?id=eq.${id}`);
   },
 
-  async saveTransaction(transaction) {
-    const dbObj = toDbTransaction(transaction);
-    if (transaction.id) {
-      return request('PATCH', TABLES.transactions, dbObj, `?id=eq.${transaction.id}`);
-    } else {
-      return request('POST', TABLES.transactions, dbObj);
-    }
+  // ── Transactions ──────────────────────────────────────────────────────────
+  async insertTransaction(transaction) {
+    return request('POST', TABLES.transactions, { id: transaction.id, ...toDbTransaction(transaction) });
+  },
+
+  async updateTransaction(transaction) {
+    return request('PATCH', TABLES.transactions, toDbTransaction(transaction), `?id=eq.${transaction.id}`);
   },
 
   async deleteTransaction(id) {
     return request('DELETE', TABLES.transactions, null, `?id=eq.${id}`);
   },
 
-  async saveTransfer(transfer) {
-    const dbObj = toDbTransfer(transfer);
-    if (transfer.id) {
-      return request('PATCH', TABLES.transfers, dbObj, `?id=eq.${transfer.id}`);
-    } else {
-      return request('POST', TABLES.transfers, dbObj);
-    }
+  // ── Fund Sources ──────────────────────────────────────────────────────────
+  async insertFundSource(fundSource) {
+    return request('POST', TABLES.fundSources, { id: fundSource.id, ...toDbFundSource(fundSource) });
+  },
+
+  async updateFundSource(fundSource) {
+    return request('PATCH', TABLES.fundSources, toDbFundSource(fundSource), `?id=eq.${fundSource.id}`);
+  },
+
+  // ── Transfers ─────────────────────────────────────────────────────────────
+  async insertTransfer(transfer) {
+    return request('POST', TABLES.transfers, { id: transfer.id, ...toDbTransfer(transfer) });
   },
 
   async deleteTransfer(id) {
     return request('DELETE', TABLES.transfers, null, `?id=eq.${id}`);
   },
 
-  async saveBudget(budget) {
-    const dbObj = toDbBudget(budget);
-    if (budget.id) {
-      return request('PATCH', TABLES.budgets, dbObj, `?id=eq.${budget.id}`);
-    } else {
-      return request('POST', TABLES.budgets, dbObj);
-    }
+  // ── Budgets ───────────────────────────────────────────────────────────────
+  async insertBudget(budget) {
+    return request('POST', TABLES.budgets, { id: budget.id, ...toDbBudget(budget) });
+  },
+
+  async updateBudget(budget) {
+    return request('PATCH', TABLES.budgets, toDbBudget(budget), `?id=eq.${budget.id}`);
   },
 
   async deleteBudget(id) {
     return request('DELETE', TABLES.budgets, null, `?id=eq.${id}`);
   },
 
-  async saveRecurringRule(rule) {
-    const dbObj = toDbRecurringRule(rule);
-    if (rule.id) {
-      return request('PATCH', TABLES.recurringRules, dbObj, `?id=eq.${rule.id}`);
-    } else {
-      return request('POST', TABLES.recurringRules, dbObj);
-    }
+  // ── Recurring Rules ───────────────────────────────────────────────────────
+  async insertRecurringRule(rule) {
+    return request('POST', TABLES.recurringRules, { id: rule.id, ...toDbRecurringRule(rule) });
   },
 
+  async updateRecurringRule(rule) {
+    return request('PATCH', TABLES.recurringRules, toDbRecurringRule(rule), `?id=eq.${rule.id}`);
+  },
+
+  // ── Settings ──────────────────────────────────────────────────────────────
   async saveSettings(settings) {
     try {
       const dbObj = toDbSettings(settings);
       return await request('POST', TABLES.settings, dbObj);
     } catch {
-      // user_settings table may not exist yet — silently ignore
       return null;
     }
   },
@@ -156,10 +161,14 @@ function normalizeFundSource(row) {
     id: row.id,
     name: row.name,
     type: row.type,
-    initialBalance: parseFloat(row.initial_balance),
-    currentBalance: parseFloat(row.current_balance),
+    bankName: row.bank_name,
+    accountNumber: row.account_number,
     currency: row.currency,
+    balance: parseFloat(row.balance),
+    initialBalance: parseFloat(row.initial_balance),
     color: row.color,
+    icon: row.icon,
+    notes: row.notes,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -169,16 +178,17 @@ function normalizeFundSource(row) {
 function normalizeTransaction(row) {
   return {
     id: row.id,
-    date: row.date,
     title: row.title,
-    category: row.category,
-    type: row.type,
     amount: parseFloat(row.amount),
+    type: row.type,
+    category: row.category,
     fundSourceId: row.fund_source_id,
+    date: row.date,
     reference: row.reference,
     note: row.note,
     tags: row.tags || [],
-    isReconciled: row.is_reconciled,
+    isRecurring: row.is_recurring,
+    recurringPeriod: row.recurring_period,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -187,11 +197,11 @@ function normalizeTransaction(row) {
 function normalizeTransfer(row) {
   return {
     id: row.id,
-    date: row.date,
     fromFundSourceId: row.from_fund_source_id,
     toFundSourceId: row.to_fund_source_id,
     amount: parseFloat(row.amount),
-    reference: row.reference,
+    fee: parseFloat(row.fee || 0),
+    date: row.date,
     note: row.note,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -204,6 +214,7 @@ function normalizeBudget(row) {
     category: row.category,
     limit: parseFloat(row.limit_amount),
     period: row.period,
+    fundSourceId: row.fund_source_id,
     color: row.color,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -213,16 +224,14 @@ function normalizeBudget(row) {
 function normalizeRecurringRule(row) {
   return {
     id: row.id,
-    fundSourceId: row.fund_source_id,
-    category: row.category,
-    type: row.type,
+    title: row.title,
     amount: parseFloat(row.amount),
-    frequency: row.frequency,
-    startDate: row.start_date,
-    endDate: row.end_date,
+    type: row.type,
+    category: row.category,
+    fundSourceId: row.fund_source_id,
+    period: row.period,
+    nextDueDate: row.next_due_date,
     isActive: row.is_active,
-    reference: row.reference,
-    note: row.note,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -232,37 +241,42 @@ function toDbFundSource(fs) {
   return {
     name: fs.name,
     type: fs.type,
-    initial_balance: fs.initialBalance,
-    current_balance: fs.currentBalance,
+    bank_name: fs.bankName || null,
+    account_number: fs.accountNumber || null,
     currency: fs.currency,
+    initial_balance: fs.initialBalance,
+    balance: fs.balance,
     color: fs.color,
+    icon: fs.icon,
+    notes: fs.notes || null,
     is_active: fs.isActive
   };
 }
 
 function toDbTransaction(tx) {
   return {
-    date: tx.date,
     title: tx.title,
-    category: tx.category,
-    type: tx.type,
     amount: tx.amount,
+    type: tx.type,
+    category: tx.category,
     fund_source_id: tx.fundSourceId,
-    reference: tx.reference,
-    note: tx.note,
-    tags: tx.tags,
-    is_reconciled: tx.isReconciled
+    date: tx.date,
+    reference: tx.reference || null,
+    note: tx.note || null,
+    tags: tx.tags || [],
+    is_recurring: tx.isRecurring || false,
+    recurring_period: tx.recurringPeriod || null
   };
 }
 
 function toDbTransfer(t) {
   return {
-    date: t.date,
     from_fund_source_id: t.fromFundSourceId,
     to_fund_source_id: t.toFundSourceId,
     amount: t.amount,
-    reference: t.reference,
-    note: t.note
+    fee: t.fee || 0,
+    date: t.date,
+    note: t.note || null
   };
 }
 
@@ -271,22 +285,21 @@ function toDbBudget(b) {
     category: b.category,
     limit_amount: b.limit,
     period: b.period,
+    fund_source_id: b.fundSourceId || null,
     color: b.color
   };
 }
 
 function toDbRecurringRule(r) {
   return {
-    fund_source_id: r.fundSourceId,
-    category: r.category,
-    type: r.type,
+    title: r.title,
     amount: r.amount,
-    frequency: r.frequency,
-    start_date: r.startDate,
-    end_date: r.endDate,
-    is_active: r.isActive,
-    reference: r.reference,
-    note: r.note
+    type: r.type,
+    category: r.category,
+    fund_source_id: r.fundSourceId,
+    period: r.period,
+    next_due_date: r.nextDueDate,
+    is_active: r.isActive
   };
 }
 

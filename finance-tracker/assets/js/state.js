@@ -2,9 +2,7 @@
  * @fileoverview Centralized state management with dispatch pattern
  */
 
-import { save } from './storage.js';
-
-export const STORAGE_KEY = 'finflow_v3';
+import { saveRecord } from './storage.js';
 
 /** @type {import('./types').AppState} */
 let AppState = {
@@ -110,7 +108,8 @@ export function dispatch(action, payload) {
       break;
   }
 
-  save(AppState);
+  // Write the specific record to Supabase immediately
+  saveRecord(action, payload).catch(err => console.error('saveRecord error:', err));
 
   // Re-render current view
   const currentView = AppState.currentView;
@@ -141,6 +140,10 @@ function updateActiveView(viewName) {
 function updateActiveNav(viewName) {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.toggle('active', link.dataset.view === viewName);
+  });
+  // Sync bottom tab bar
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.view === viewName);
   });
 }
 
