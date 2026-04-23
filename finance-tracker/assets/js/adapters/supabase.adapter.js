@@ -4,6 +4,26 @@
 
 import { supabase, getCurrentUser } from '../config/supabase.js';
 
+const QUERY_TIMEOUT_MS = 12000;
+
+function withTimeout(promise, label, timeoutMs = QUERY_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 export const supabaseAdapter = {
   async load(userParam = null) {
     console.log('[Adapter] load() triggered');
@@ -16,23 +36,40 @@ export const supabaseAdapter = {
       console.log('[Adapter] User fetched:', user?.id);
       if (!user) return null;
 
-      console.log('[Adapter] Awaiting fund_sources...');
-      const { data: fundSources, error: fsError } = await supabase.from('fund_sources').select('*').order('created_at');
-      
-      console.log('[Adapter] Awaiting transactions...');
-      const { data: transactions, error: txError } = await supabase.from('transactions').select('*').order('date', { ascending: false });
-      
-      console.log('[Adapter] Awaiting transfers...');
-      const { data: transfers, error: trError } = await supabase.from('transfers').select('*').order('date', { ascending: false });
-      
-      console.log('[Adapter] Awaiting budgets...');
-      const { data: budgets, error: bgError } = await supabase.from('budgets').select('*').order('created_at');
-      
-      console.log('[Adapter] Awaiting recurring_rules...');
-      const { data: recurringRules, error: rrError } = await supabase.from('recurring_rules').select('*').order('created_at');
-      
-      console.log('[Adapter] Awaiting profiles...');
-      const { data: profile, error: prError } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      console.log('[Adapter] Awaiting all bootstrap queries...');
+      const [
+        { data: fundSources, error: fsError },
+        { data: transactions, error: txError },
+        { data: transfers, error: trError },
+        { data: budgets, error: bgError },
+        { data: recurringRules, error: rrError },
+        { data: profile, error: prError }
+      ] = await Promise.all([
+        withTimeout(
+          supabase.from('fund_sources').select('*').order('created_at'),
+          'fund_sources query'
+        ),
+        withTimeout(
+          supabase.from('transactions').select('*').order('date', { ascending: false }),
+          'transactions query'
+        ),
+        withTimeout(
+          supabase.from('transfers').select('*').order('date', { ascending: false }),
+          'transfers query'
+        ),
+        withTimeout(
+          supabase.from('budgets').select('*').order('created_at'),
+          'budgets query'
+        ),
+        withTimeout(
+          supabase.from('recurring_rules').select('*').order('created_at'),
+          'recurring_rules query'
+        ),
+        withTimeout(
+          supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+          'profiles query'
+        )
+      ]);
 
       console.log('[Adapter] All sequential queries resolved successfully');
 
