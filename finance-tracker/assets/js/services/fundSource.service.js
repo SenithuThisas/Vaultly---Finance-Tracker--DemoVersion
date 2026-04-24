@@ -3,6 +3,7 @@
  */
 
 import { getState, dispatch } from '../state.js';
+import { sanitizeFormData, sanitizeAccountNumber, VALIDATORS, validate } from '../security/index.js';
 
 const uuid = () => crypto.randomUUID();
 
@@ -14,18 +15,32 @@ export const FundSourceService = {
    * @returns {Object}
    */
   add(data) {
+    const clean = sanitizeFormData({
+      ...data,
+      initialBalance: parseFloat(data.balance) || 0
+    });
+    const validation = validate(VALIDATORS.fundSource, {
+      name: clean.name,
+      type: clean.type || 'bank',
+      currency: clean.currency || 'LKR',
+      initialBalance: clean.initialBalance
+    });
+    if (!validation.isValid) {
+      throw new Error(Object.values(validation.errors)[0]);
+    }
+
     const newFs = {
       id: uuid(),
-      name: data.name,
-      type: data.type || 'bank',
-      bankName: data.bankName || null,
-      accountNumber: data.accountNumber || null,
-      currency: data.currency || 'LKR',
-      balance: parseFloat(data.balance) || 0,
-      initialBalance: parseFloat(data.balance) || 0,
-      color: data.color || '#10B981',
-      icon: data.icon || '🏦',
-      notes: data.notes || '',
+      name: clean.name,
+      type: clean.type || 'bank',
+      bankName: clean.bankName || null,
+      accountNumber: sanitizeAccountNumber(clean.accountNumber || ''),
+      currency: clean.currency || 'LKR',
+      balance: clean.initialBalance,
+      initialBalance: clean.initialBalance,
+      color: clean.color || '#10B981',
+      icon: clean.icon || '🏦',
+      notes: clean.notes || '',
       createdAt: new Date().toISOString(),
       isActive: true
     };
@@ -45,7 +60,11 @@ export const FundSourceService = {
     const fs = state.fundSources.find(f => f.id === id);
     if (!fs) return null;
 
-    const updatedFs = { ...fs, ...updates };
+    const clean = sanitizeFormData({ ...updates });
+    if (clean.accountNumber !== undefined) {
+      clean.accountNumber = sanitizeAccountNumber(clean.accountNumber);
+    }
+    const updatedFs = { ...fs, ...clean };
     dispatch('EDIT_FUND_SOURCE', updatedFs);
     return updatedFs;
   },
