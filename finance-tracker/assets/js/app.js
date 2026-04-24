@@ -32,6 +32,7 @@ import {
   getConfiguredIdleTimeoutMs,
   setConfiguredIdleTimeoutMs
 } from './security/session.js';
+import { requireAuth, requireGuest } from './security/guards.js';
 
 import { renderDashboard } from './views/dashboard.view.js';
 import { renderBanks } from './views/banks.view.js';
