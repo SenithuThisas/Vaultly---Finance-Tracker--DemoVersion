@@ -9,6 +9,7 @@ import { drawSparkline, formatCurrency } from '../components/charts.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { CATEGORIES, FUND_SOURCE_TYPES, CURRENCIES } from '../data/seed.js';
+import { canSubmit, translateError } from '../security/index.js';
 
 /**
  * Render banks/fund sources view
@@ -170,6 +171,8 @@ function showAddAccountModal() {
       <input type="hidden" id="modal-color" value="${colorSwatches[0]}">
     </div>
   `, () => {
+    if (!canSubmit('add-account-form')) return false;
+
     const name = document.getElementById('modal-account-name').value;
     const type = document.getElementById('modal-account-type').value;
     const bankName = document.getElementById('modal-bank-name').value;
@@ -183,10 +186,15 @@ function showAddAccountModal() {
       return false;
     }
 
-    FundSourceService.add({ name, type, bankName, accountNumber, balance, currency, color });
-    showToast('Account created', 'success');
-    renderBanks();
-    return true;
+    try {
+      FundSourceService.add({ name, type, bankName, accountNumber, balance, currency, color });
+      showToast('Account created', 'success');
+      renderBanks();
+      return true;
+    } catch (error) {
+      showToast(translateError(error), 'error');
+      return false;
+    }
   });
 }
 
@@ -242,6 +250,8 @@ function showEditAccountModal(id) {
       <input type="text" class="form-input" id="edit-notes" value="${fs.notes || ''}">
     </div>
   `, () => {
+    if (!canSubmit('edit-account-form')) return false;
+
     const name = document.getElementById('edit-account-name').value;
     const type = document.getElementById('edit-account-type').value;
     const bankName = document.getElementById('edit-bank-name').value;
@@ -256,10 +266,15 @@ function showEditAccountModal(id) {
       return false;
     }
 
-    FundSourceService.edit(id, { name, type, bankName, accountNumber, balance, currency, color, notes });
-    showToast('Account updated', 'success');
-    renderBanks();
-    return true;
+    try {
+      FundSourceService.edit(id, { name, type, bankName, accountNumber, balance, currency, color, notes });
+      showToast('Account updated', 'success');
+      renderBanks();
+      return true;
+    } catch (error) {
+      showToast(translateError(error), 'error');
+      return false;
+    }
   }, 'Save');
 }
 
