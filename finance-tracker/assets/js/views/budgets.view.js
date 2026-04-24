@@ -8,6 +8,7 @@ import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { CATEGORIES, DR_CATEGORIES } from '../data/seed.js';
 import { formatCurrency, formatPct } from '../components/charts.js';
+import { canSubmit, translateError } from '../security/index.js';
 
 /**
  * Render budgets view
@@ -155,6 +156,8 @@ function showAddBudgetModal(category = '') {
       <input type="number" class="form-input" id="budget-limit" min="1" step="1000" placeholder="50000">
     </div>
   `, () => {
+    if (!canSubmit('add-budget-form')) return false;
+
     const category = document.getElementById('budget-category').value;
     const limit = document.getElementById('budget-limit').value;
 
@@ -167,10 +170,15 @@ function showAddBudgetModal(category = '') {
       return false;
     }
 
-    BudgetService.add({ category, limit });
-    showToast('Budget created', 'success');
-    renderBudgets();
-    return true;
+    try {
+      BudgetService.add({ category, limit });
+      showToast('Budget created', 'success');
+      renderBudgets();
+      return true;
+    } catch (error) {
+      showToast(translateError(error), 'error');
+      return false;
+    }
   });
 }
 
@@ -191,6 +199,8 @@ function showEditBudgetModal(id) {
       <input type="number" class="form-input" id="edit-budget-limit" min="1" step="1000" value="${budget.limit}">
     </div>
   `, () => {
+    if (!canSubmit('edit-budget-form')) return false;
+
     const limit = document.getElementById('edit-budget-limit').value;
 
     if (!limit || parseFloat(limit) <= 0) {
@@ -198,10 +208,15 @@ function showEditBudgetModal(id) {
       return false;
     }
 
-    BudgetService.edit(id, { limit: parseFloat(limit) });
-    showToast('Budget updated', 'success');
-    renderBudgets();
-    return true;
+    try {
+      BudgetService.edit(id, { limit: parseFloat(limit) });
+      showToast('Budget updated', 'success');
+      renderBudgets();
+      return true;
+    } catch (error) {
+      showToast(translateError(error), 'error');
+      return false;
+    }
   }, 'Save');
 }
 
