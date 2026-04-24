@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Vaultly - Personal Finance Tracker</title>
-  <meta name="description" content="Track your finances, budgets, and investments with Vaultly — a modern personal finance dashboard.">
+  <meta name="description"
+    content="Track your finances, budgets, and investments with Vaultly — a modern personal finance dashboard.">
   <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="X-XSS-Protection" content="1; mode=block">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
@@ -33,6 +34,7 @@
   </div>
 
   <div class="auth-screen" id="auth-screen">
+    <canvas id="auth-canvas"></canvas>
     <div class="auth-card">
       <h2>Welcome to Vaultly</h2>
       <p>Sign in to access your financial workspace.</p>
@@ -47,6 +49,9 @@
         </div>
         <div class="auth-error" id="auth-error"></div>
         <button type="submit" class="btn btn-primary" id="auth-submit-btn">Sign In</button>
+        <div style="text-align: center; margin-top: 1rem;">
+          <button type="button" class="auth-muted-link" id="auth-toggle-mode-btn">Don't have an account? Sign Up</button>
+        </div>
       </form>
       <a href="#" id="auth-signout-link" class="auth-muted-link">Sign out all other sessions</a>
     </div>
@@ -124,6 +129,14 @@
         </svg>
         <span class="nav-link-text">Settings</span>
       </button>
+      <button class="nav-link text-danger" id="sidebar-signout-btn" data-tooltip="Sign Out" style="color: var(--accent-red); margin-top: 4px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        <span class="nav-link-text">Sign Out</span>
+      </button>
     </div>
   </aside>
 
@@ -162,14 +175,17 @@
   <nav class="bottom-tab-bar" id="bottom-tab-bar" data-app-shell>
     <button class="tab-item active" data-view="dashboard">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" />
-        <rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" />
+        <rect x="3" y="3" width="7" height="9" rx="1" />
+        <rect x="14" y="3" width="7" height="5" rx="1" />
+        <rect x="14" y="12" width="7" height="9" rx="1" />
+        <rect x="3" y="16" width="7" height="5" rx="1" />
       </svg>
       Home
     </button>
     <button class="tab-item" data-view="banks">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M12 4v16" />
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <path d="M12 4v16" />
       </svg>
       Accounts
     </button>
@@ -181,13 +197,17 @@
     </button>
     <button class="tab-item" data-view="budgets">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /><path d="M12 3v18" />
+        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
+        <path d="M12 3v18" />
       </svg>
       Budgets
     </button>
     <button class="tab-item" data-view="analytics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+        <path d="M3 3v18h18" />
+        <path d="M18 17V9" />
+        <path d="M13 17V5" />
+        <path d="M8 17v-3" />
       </svg>
       Analytics
     </button>
