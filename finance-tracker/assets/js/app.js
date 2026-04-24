@@ -28,12 +28,10 @@ import {
   signIn,
   signUp,
   signOut,
-  resetPassword,
   getCurrentUser,
   getConfiguredIdleTimeoutMs,
   setConfiguredIdleTimeoutMs
 } from './security/session.js';
-import { requireAuth, requireGuest } from './security/guards.js';
 
 import { renderDashboard } from './views/dashboard.view.js';
 import { renderBanks } from './views/banks.view.js';
@@ -71,39 +69,17 @@ function hideApp() {
   document.querySelectorAll('[data-app-shell]').forEach(el => el.classList.add('hidden-shell'));
 }
 
-function showAuthScreen() {
+function showAuthScreen(message = '') {
   const auth = document.getElementById('auth-screen');
   if (!auth) return;
 
-  const user = getCurrentUser();
-  const guard = requireAuth();
-  
-  // Logic to determine which view to show
-  const hash = window.location.hash || '';
-  const search = window.location.search || '';
-  const isSignupConfirm = hash.includes('type=signup') || hash.includes('token_hash=') || search.includes('type=signup');
-
-  if (isSignupConfirm) {
-    switchAuthView('verify');
-    handleVerifyFlow();
-  } else if (user && !user.email_confirmed_at) {
-    document.getElementById('confirm-email-display').textContent = user.email;
-    switchAuthView('confirm');
-  } else {
-    switchAuthView('login');
+  const error = document.getElementById('auth-error');
+  if (error) {
+    error.textContent = message;
+    error.style.display = message ? 'block' : 'none';
   }
 
   auth.classList.add('open');
-  auth.classList.remove('hidden');
-}
-
-function switchAuthView(viewName) {
-  document.querySelectorAll('.auth-view').forEach(v => v.classList.add('hidden'));
-  const target = document.getElementById(`auth-view-${viewName}`);
-  if (target) {
-    target.classList.remove('hidden');
-    target.classList.add('auth-fade-in');
-  }
 }
 
 function hideAuthScreen() {
@@ -199,251 +175,83 @@ function showSessionExpired() {
 }
 
 function setupAuthHandlers() {
-  // Elements
-  const loginForm = document.getElementById('login-form');
-  const signupForm = document.getElementById('signup-form');
-  const loginEmail = document.getElementById('login-email');
-  const signupEmail = document.getElementById('signup-email');
-  const signupPassword = document.getElementById('signup-password');
-  const signupPasswordConfirm = document.getElementById('signup-password-confirm');
-  const resendBtn = document.getElementById('resend-confirm-btn');
-  const signOutAllBtn = document.getElementById('auth-signout-all-btn');
+  const authForm = document.getElementById('auth-form');
+  const signOutLink = document.getElementById('auth-signout-link');
+  const toggleModeBtn = document.getElementById('auth-toggle-mode-btn');
+  const submitBtn = document.getElementById('auth-submit-btn');
+  const authTitle = document.querySelector('.auth-card h2');
+  const authDesc = document.querySelector('.auth-card p');
 
-  // Mode Switching
-  document.getElementById('switch-to-signup')?.addEventListener('click', () => switchAuthView('signup'));
-  document.getElementById('switch-to-login')?.addEventListener('click', () => switchAuthView('login'));
-  document.getElementById('confirm-back-btn')?.addEventListener('click', () => switchAuthView('signup'));
-  document.getElementById('show-forgot-btn')?.addEventListener('click', () => switchAuthView('forgot'));
-  document.getElementById('forgot-back-btn')?.addEventListener('click', () => switchAuthView('login'));
+  let isSignUpMode = false;
 
-  const forgotForm = document.getElementById('forgot-form');
-
-  // Password Visibility
-  const setupToggle = (inputId, toggleId) => {
-    const input = document.getElementById(inputId);
-    const toggle = document.getElementById(toggleId);
-    toggle?.addEventListener('click', () => {
-      const isPassword = input.type === 'password';
-      input.type = isPassword ? 'text' : 'password';
-      toggle.textContent = isPassword ? 'visibility_off' : 'visibility';
-    });
-  };
-  setupToggle('login-password', 'login-password-toggle');
-  setupToggle('signup-password', 'signup-password-toggle');
-
-  // Inline Email Validation
-  const validateEmail = (input, validIconId) => {
-    const icon = document.getElementById(validIconId);
-    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value);
-    if (isValid) icon?.classList.remove('hidden');
-    else icon?.classList.add('hidden');
-  };
-  loginEmail?.addEventListener('input', () => validateEmail(loginEmail, 'login-email-valid'));
-  signupEmail?.addEventListener('input', () => validateEmail(signupEmail, 'signup-email-valid'));
-
-  // Password Strength & Matching
-  signupPassword?.addEventListener('input', () => {
-    const strength = calculatePasswordStrength(signupPassword.value);
-    updateStrengthMeter(strength);
-    checkPasswordMatch();
-  });
-
-  signupPasswordConfirm?.addEventListener('input', checkPasswordMatch);
-
-  // Sign In Submission
-  loginForm?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const email = loginEmail.value.trim();
-    const password = document.getElementById('login-password').value;
-    const remember = document.getElementById('login-remember').checked;
-    const btn = document.getElementById('login-submit-btn');
-
-    setButtonLoading(btn, 'Signing in...');
-    hideErrorBanner('login-error-banner');
-
-    const { error } = await signIn(email, password, { persistSession: remember });
-    setButtonReady(btn);
-
-    if (error) {
-      showErrorBanner('login-error-banner', translateError(error));
-      shakeInput(loginForm);
+  toggleModeBtn?.addEventListener('click', () => {
+    isSignUpMode = !isSignUpMode;
+    if (isSignUpMode) {
+      submitBtn.textContent = 'Sign Up';
+      toggleModeBtn.textContent = 'Already have an account? Sign In';
+      if (authTitle) authTitle.textContent = 'Create an Account';
+      if (authDesc) authDesc.textContent = 'Sign up to start tracking your finances.';
     } else {
-      hideAuthScreen();
-      // Redirect to intended route if exists
-      const intended = sessionStorage.getItem('intendedRoute');
-      if (intended) {
-        sessionStorage.removeItem('intendedRoute');
-        window.location.href = intended;
-      }
+      submitBtn.textContent = 'Sign In';
+      toggleModeBtn.textContent = 'Don\'t have an account? Sign Up';
+      if (authTitle) authTitle.textContent = 'Welcome to Vaultly';
+      if (authDesc) authDesc.textContent = 'Sign in to access your financial workspace.';
     }
+    const authError = document.getElementById('auth-error');
+    if (authError) authError.style.display = 'none';
   });
 
-  // Sign Up Submission
-  signupForm?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const email = signupEmail.value.trim();
-    const password = signupPassword.value;
-    const btn = document.getElementById('signup-submit-btn');
+  authForm?.addEventListener('submit', async event => {
+    event.preventDefault();
 
-    if (calculatePasswordStrength(password) < 2) {
-      showErrorBanner('signup-error-banner', 'Please choose a stronger password.');
+    if (!canSubmit('auth-form', 1200)) return;
+
+    const email = document.getElementById('auth-email')?.value?.trim();
+    const password = document.getElementById('auth-password')?.value || '';
+
+    if (!email || !password) {
+      showToast('Email and password are required.', 'error');
       return;
     }
 
-    setButtonLoading(btn, 'Creating vault...');
-    hideErrorBanner('signup-error-banner');
-
-    const { error, data } = await signUp(email, password);
-    setButtonReady(btn);
-
-    if (error) {
-      showErrorBanner('signup-error-banner', translateError(error));
-      shakeInput(signupForm);
-    } else {
-      document.getElementById('confirm-email-display').textContent = email;
-      switchAuthView('confirm');
-    }
-  });
-
-  // Forgot Password Submission
-  forgotForm?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const email = document.getElementById('forgot-email').value.trim();
-    const btn = document.getElementById('forgot-submit-btn');
-
-    setButtonLoading(btn, 'Sending link...');
-    hideErrorBanner('forgot-error-banner');
-
-    const { error } = await resetPassword(email);
-    setButtonReady(btn);
-
-    if (error) {
-      showErrorBanner('forgot-error-banner', translateError(error));
-    } else {
-      document.getElementById('confirm-email-display').textContent = email;
-      // Show confirmation screen with reset-specific text
-      const statusTitle = document.querySelector('#auth-view-confirm .auth-status-title');
-      const statusText = document.querySelector('#auth-view-confirm .auth-status-text');
-      if (statusTitle) statusTitle.textContent = 'Reset link sent!';
-      if (statusText) statusText.textContent = `We've sent a password reset link to ${email}. Check your inbox to get back in.`;
-      switchAuthView('confirm');
-    }
-  });
-
-  // Resend Email
-  resendBtn?.addEventListener('click', async () => {
-    const email = document.getElementById('confirm-email-display').textContent;
-    setButtonLoading(resendBtn, 'Sending...');
+    setButtonLoading(submitBtn, isSignUpMode ? 'Signing up...' : 'Signing in...');
     
-    // In a real app, you'd call a resend confirmation email function here
-    // For now, we simulate success as Supabase's signUp handles this mostly
-    setTimeout(() => {
-      setButtonReady(resendBtn);
-      showToast('Confirmation email resent!', 'success');
-      startResendCooldown();
-    }, 1000);
-  });
-
-  signOutAllBtn?.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to sign out from all other devices?')) {
-      await signOut('others');
-      showToast('Signed out of all other sessions', 'success');
+    let error;
+    if (isSignUpMode) {
+      const result = await signUp(email, password);
+      error = result.error;
+      
+      if (!error) {
+        showToast('Sign up successful! You are now logged in.', 'success');
+      }
+    } else {
+      const result = await signIn(email, password);
+      error = result.error;
     }
+    
+    setButtonReady(submitBtn);
+
+    if (error) {
+      const authError = document.getElementById('auth-error');
+      if (authError) {
+        authError.textContent = translateError(error);
+        authError.style.display = 'block';
+      }
+      return;
+    }
+
+    hideAuthScreen();
   });
 
-  // Sidebar signout
-  document.getElementById('sidebar-signout-btn')?.addEventListener('click', async () => {
+  signOutLink?.addEventListener('click', async event => {
+    event.preventDefault();
+    await signOut('global');
+  });
+
+  const sidebarSignOutBtn = document.getElementById('sidebar-signout-btn');
+  sidebarSignOutBtn?.addEventListener('click', async () => {
     await signOut('local');
   });
-}
-
-function calculatePasswordStrength(p) {
-  if (!p) return 0;
-  let s = 0;
-  if (p.length >= 8) s++;
-  if (p.length >= 8 && (/[0-9]/.test(p) || /[^A-Za-z0-9]/.test(p))) s++;
-  if (p.length >= 12 && /[A-Z]/.test(p) && /[0-9]/.test(p) && /[^A-Za-z0-9]/.test(p)) s++;
-  if (p.length >= 6) s = Math.max(s, 1);
-  return Math.min(s + (p.length >= 8 ? 1 : 0), 4);
-}
-
-function updateStrengthMeter(s) {
-  const meter = document.getElementById('password-strength-meter');
-  const label = document.getElementById('password-strength-label');
-  const texts = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
-  meter.className = `strength-meter strength-${s}`;
-  label.textContent = `Strength: ${texts[s]}`;
-}
-
-function checkPasswordMatch() {
-  const p = document.getElementById('signup-password').value;
-  const c = document.getElementById('signup-password-confirm').value;
-  const icon = document.getElementById('signup-password-match');
-  const btn = document.getElementById('signup-submit-btn');
-  
-  const matches = p === c && c.length > 0;
-  if (matches) icon.classList.remove('hidden');
-  else icon.classList.add('hidden');
-  
-  btn.disabled = !matches || calculatePasswordStrength(p) < 2;
-}
-
-function showErrorBanner(id, msg) {
-  const b = document.getElementById(id);
-  if (!b) return;
-  b.textContent = msg;
-  b.classList.remove('hidden');
-}
-
-function hideErrorBanner(id) {
-  document.getElementById(id)?.classList.add('hidden');
-}
-
-function shakeInput(el) {
-  el.classList.remove('auth-shake');
-  void el.offsetWidth;
-  el.classList.add('auth-shake');
-}
-
-let resendTimer = null;
-function startResendCooldown() {
-  const btn = document.getElementById('resend-confirm-btn');
-  const text = document.getElementById('resend-timer-text');
-  let timeLeft = 30;
-  
-  btn.disabled = true;
-  text.classList.remove('hidden');
-  
-  clearInterval(resendTimer);
-  resendTimer = setInterval(() => {
-    timeLeft--;
-    text.textContent = `Resend in ${timeLeft}s...`;
-    if (timeLeft <= 0) {
-      clearInterval(resendTimer);
-      btn.disabled = false;
-      text.classList.add('hidden');
-    }
-  }, 1000);
-}
-
-async function handleVerifyFlow() {
-  const loading = document.getElementById('verify-loading');
-  const success = document.getElementById('verify-success');
-  const errorView = document.getElementById('verify-error');
-  
-  // Verification happens automatically by Supabase when redirected with token
-  // We just wait a bit to show the UI state
-  setTimeout(async () => {
-    const user = getCurrentUser();
-    if (user?.email_confirmed_at) {
-      loading.classList.add('hidden');
-      success.classList.remove('hidden');
-      setTimeout(() => window.location.href = '/dashboard', 2000);
-    } else {
-      loading.classList.add('hidden');
-      errorView.classList.remove('hidden');
-    }
-  }, 1500);
 }
 
 function setupMobileViewport() {
