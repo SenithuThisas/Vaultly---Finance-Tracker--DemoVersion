@@ -47,6 +47,21 @@ export function setState(newState) {
   AppState = newState;
 }
 
+export function clearAppState() {
+  AppState.fundSources = [];
+  AppState.transactions = [];
+  AppState.transfers = [];
+  AppState.budgets = [];
+  AppState.recurringRules = [];
+  AppState.filters = {};
+  AppState.currentView = 'dashboard';
+  AppState.settings = {
+    currency: 'LKR',
+    dateFormat: 'DD/MM/YYYY',
+    userName: 'User'
+  };
+}
+
 /**
  * Dispatch action - mutates state, saves to storage, re-renders view
  * @param {string} action - Action type
