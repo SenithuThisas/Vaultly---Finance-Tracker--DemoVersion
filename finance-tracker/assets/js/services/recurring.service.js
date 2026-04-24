@@ -3,6 +3,7 @@
  */
 
 import { getState, dispatch } from '../state.js';
+import { sanitizeFormData, VALIDATORS, validate } from '../security/index.js';
 
 const uuid = () => crypto.randomUUID();
 
@@ -76,15 +77,31 @@ export const RecurringService = {
    * @returns {Object}
    */
   add(data) {
+    const clean = sanitizeFormData({
+      ...data,
+      amount: parseFloat(data.amount) || 0
+    });
+    const validation = validate(VALIDATORS.transaction, {
+      title: clean.title,
+      amount: clean.amount,
+      type: clean.type || 'DR',
+      category: clean.category,
+      fundSourceId: clean.fundSourceId,
+      date: clean.nextDueDate || new Date().toISOString().split('T')[0]
+    });
+    if (!validation.isValid) {
+      throw new Error(Object.values(validation.errors)[0]);
+    }
+
     const newRule = {
       id: uuid(),
-      title: data.title,
-      amount: parseFloat(data.amount) || 0,
-      type: data.type || 'DR',
-      category: data.category,
-      fundSourceId: data.fundSourceId,
-      period: data.period || 'monthly',
-      nextDueDate: data.nextDueDate || new Date().toISOString().split('T')[0],
+      title: clean.title,
+      amount: clean.amount,
+      type: clean.type || 'DR',
+      category: clean.category,
+      fundSourceId: clean.fundSourceId,
+      period: clean.period || 'monthly',
+      nextDueDate: clean.nextDueDate || new Date().toISOString().split('T')[0],
       isActive: true
     };
 
