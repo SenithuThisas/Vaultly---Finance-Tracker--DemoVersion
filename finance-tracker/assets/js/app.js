@@ -5,7 +5,7 @@
 import { setState, navigateTo, getState, clearAppState } from './state.js';
 import { load, saveRecord, exportAllCSV, exportJSON, importJSON, readFile } from './storage.js';
 import { checkSupabaseHealth, isConfigured } from './config/supabase.js';
-import { getSeedData } from './data/seed.js';
+
 import { RecurringService } from './services/recurring.service.js';
 import { initNav, updateBadges } from './components/nav.js';
 import { initModal, closeModal } from './components/modal.js';
@@ -113,14 +113,13 @@ function restoreLastView() {
 async function loadUserData() {
   let state = await load();
 
-  if (!state || !state.transactions || state.transactions.length === 0) {
-    const seed = getSeedData();
+  if (!state || !state.transactions) {
     state = {
-      fundSources: seed.fundSources,
-      transactions: seed.transactions,
-      transfers: seed.transfers,
-      budgets: seed.budgets,
-      recurringRules: seed.recurringRules,
+      fundSources: [],
+      transactions: [],
+      transfers: [],
+      budgets: [],
+      recurringRules: [],
       currentView: 'dashboard',
       filters: {},
       settings: {
@@ -129,10 +128,6 @@ async function loadUserData() {
         userName: 'User'
       }
     };
-
-    seedToSupabase(seed).catch(error => {
-      console.error('Seed push failed:', error);
-    });
   }
 
   setState(state);
@@ -148,23 +143,6 @@ async function loadUserData() {
   restoreLastView();
 }
 
-async function seedToSupabase(seed) {
-  for (const fs of seed.fundSources) {
-    await saveRecord('ADD_FUND_SOURCE', fs);
-  }
-  for (const tx of seed.transactions) {
-    await saveRecord('ADD_TRANSACTION', tx);
-  }
-  for (const trf of seed.transfers) {
-    await saveRecord('ADD_TRANSFER', trf);
-  }
-  for (const b of seed.budgets) {
-    await saveRecord('ADD_BUDGET', b);
-  }
-  for (const r of seed.recurringRules) {
-    await saveRecord('ADD_RECURRING_RULE', r);
-  }
-}
 
 function initCoreUI() {
   initModal();
