@@ -9,6 +9,7 @@ import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { openDrawer, closeDrawer } from '../components/drawer.js';
 import { formatCurrency } from '../components/charts.js';
+import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 
 /**
  * Render transfers view
@@ -211,6 +212,8 @@ export function showAddTransferForm() {
 }
 
 function saveTransfer() {
+  if (!canSubmit('transfer-form')) return;
+
   const fromFundSourceId = document.getElementById('transfer-from')?.value;
   const toFundSourceId = document.getElementById('transfer-to')?.value;
   const amount = document.getElementById('transfer-amount')?.value;
@@ -240,18 +243,26 @@ function saveTransfer() {
     return;
   }
 
-  TransferService.add({
-    fromFundSourceId,
-    toFundSourceId,
-    amount,
-    fee: fee || 0,
-    date,
-    note
-  });
+  const saveBtn = document.getElementById('drawer-save');
+  setButtonLoading(saveBtn, 'Transferring...');
+  try {
+    TransferService.add({
+      fromFundSourceId,
+      toFundSourceId,
+      amount,
+      fee: fee || 0,
+      date,
+      note
+    });
 
-  closeDrawer();
-  showToast(`Transfer of ${formatCurrency(parseFloat(amount))} completed`, 'success');
-  renderTransfers();
+    closeDrawer();
+    showToast(`Transfer of ${formatCurrency(parseFloat(amount))} completed`, 'success');
+    renderTransfers();
+  } catch (error) {
+    showToast(translateError(error), 'error');
+  } finally {
+    setButtonReady(saveBtn);
+  }
 }
 
 // Global function for deletion
