@@ -3,7 +3,6 @@
  */
 
 import { saveRecord } from './storage.js';
-import { showToast } from './components/toast.js';
 
 /** @type {import('./types').AppState} */
 let AppState = {
@@ -46,6 +45,21 @@ export function getState() {
  */
 export function setState(newState) {
   AppState = newState;
+}
+
+export function clearAppState() {
+  AppState.fundSources = [];
+  AppState.transactions = [];
+  AppState.transfers = [];
+  AppState.budgets = [];
+  AppState.recurringRules = [];
+  AppState.filters = {};
+  AppState.currentView = 'dashboard';
+  AppState.settings = {
+    currency: 'LKR',
+    dateFormat: 'DD/MM/YYYY',
+    userName: 'User'
+  };
 }
 
 /**
@@ -110,10 +124,7 @@ export function dispatch(action, payload) {
   }
 
   // Write the specific record to Supabase immediately
-  saveRecord(action, payload).catch(err => {
-    console.error('saveRecord error:', err);
-    showToast('Failed to save data. Please check your connection.', 'error');
-  });
+  saveRecord(action, payload).catch(err => console.error('saveRecord error:', err));
 
   // Re-render current view
   const currentView = AppState.currentView;
@@ -163,30 +174,5 @@ function updateBreadcrumb(viewName) {
       analytics: 'Analytics'
     };
     breadcrumb.textContent = names[viewName] || viewName;
-  }
-}
-
-/**
- * Clear the entire state (used on sign out)
- */
-export function clearState() {
-  AppState = {
-    fundSources: [],
-    transactions: [],
-    transfers: [],
-    budgets: [],
-    recurringRules: [],
-    currentView: 'dashboard',
-    filters: {},
-    settings: {
-      currency: 'LKR',
-      dateFormat: 'DD/MM/YYYY',
-      userName: 'User'
-    }
-  };
-
-  const currentView = AppState.currentView;
-  if (viewRenderers[currentView]) {
-    viewRenderers[currentView]();
   }
 }

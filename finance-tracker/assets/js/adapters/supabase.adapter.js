@@ -1,394 +1,172 @@
 /**
- * @fileoverview Supabase storage adapter using @supabase/supabase-js SDK
+ * @fileoverview Supabase storage adapter
  */
 
-import { supabase, getCurrentUser } from '../config/supabase.js';
+import { supabase, isConfigured, getSupabaseHeaders } from '../config/supabase.js';
+import { getCurrentUser } from '../security/session.js';
 
-const QUERY_TIMEOUT_MS = 12000;
-const RETRY_DELAYS_MS = [1000, 2000, 4000];
-const HEALTH_TIMEOUT_MS = 3000;
-const QUERY_CONCURRENCY = 2;
+const TABLES = {
+  fundSources: 'fund_sources',
+  transactions: 'transactions',
+  transfers: 'transfers',
+  budgets: 'budgets',
+  recurringRules: 'recurring_rules',
+  settings: 'user_settings'
+};
 
-let activeLoad = null;
-
-function emitProgress(listeners, payload) {
-  listeners.forEach((listener) => {
-    try {
-      listener?.(payload);
-    } catch (error) {
-      console.warn('[Adapter] onProgress listener failed:', error);
-    }
-  });
+async function getHeaders() {
+  return getSupabaseHeaders(true);
 }
 
-function withTimeout(promise, label, timeoutMs = QUERY_TIMEOUT_MS) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-  });
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withRetry(queryFactory, label, retryDelaysMs = RETRY_DELAYS_MS) {
-  return withRetryAndTimeout(queryFactory, label, retryDelaysMs, QUERY_TIMEOUT_MS);
-}
-
-async function withRetryAndTimeout(queryFactory, label, retryDelaysMs = RETRY_DELAYS_MS, timeoutMs = QUERY_TIMEOUT_MS) {
-  let lastError = null;
-
-  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
-    try {
-      return await withTimeout(queryFactory(), label, timeoutMs);
-    } catch (error) {
-      lastError = error;
-      if (attempt >= retryDelaysMs.length) break;
-
-      const delayMs = retryDelaysMs[attempt];
-      console.warn(`[Adapter] ${label} failed (attempt ${attempt + 1}), retrying in ${delayMs}ms`, error);
-      await sleep(delayMs);
-    }
+async function request(method, table, body = null, query = '') {
+  if (!isConfigured()) {
+    throw new Error('Supabase not configured');
   }
 
-  throw lastError;
-}
+  const url = `${supabase.url}/rest/v1/${table}${query}`;
+  const headers = await getHeaders();
 
-async function runWithConcurrency(taskFactories, limit = QUERY_CONCURRENCY) {
-  const results = new Array(taskFactories.length);
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < taskFactories.length) {
-      const index = cursor;
-      cursor += 1;
-
-      try {
-        const value = await taskFactories[index]();
-        results[index] = { status: 'fulfilled', value };
-      } catch (reason) {
-        results[index] = { status: 'rejected', reason };
-      }
-    }
+  // DELETE requests must not include a body or Prefer: return=representation
+  if (method === 'DELETE') {
+    delete headers['Prefer'];
   }
 
-  const workerCount = Math.min(limit, taskFactories.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
+  const options = { method, headers };
+
+  if (body && method !== 'DELETE') {
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url, options);
+
+  // 204 No Content is a valid success (common for DELETE/PATCH)
+  if (response.status === 204) return null;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(errorText);
+    } catch {
+      parsed = null;
+    }
+
+    const err = new Error(parsed?.message || `Supabase error: ${response.status}`);
+    err.status = response.status;
+    err.code = parsed?.code || null;
+    err.details = parsed?.details || errorText;
+    throw err;
+  }
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 export const supabaseAdapter = {
-  async load(userParam = null, options = {}) {
-    const {
-      onProgress,
-      queryTimeoutMs = QUERY_TIMEOUT_MS,
-      healthTimeoutMs = HEALTH_TIMEOUT_MS
-    } = options;
-
-    if (activeLoad) {
-      if (onProgress) activeLoad.listeners.add(onProgress);
-      console.log('[Adapter] load() deduped - returning in-flight promise');
-      return activeLoad.promise;
-    }
-
-    const listeners = new Set();
-    if (onProgress) listeners.add(onProgress);
-
-    const loadPromise = (async () => {
-    console.log('[Adapter] load() triggered');
+  async load() {
     try {
-      let user = userParam;
-      if (!user) {
-        console.log('[Adapter] Awaiting getCurrentUser()...');
-        user = await getCurrentUser();
-      }
-      console.log('[Adapter] User fetched:', user?.id);
-      if (!user) return null;
-
-      await withTimeout(
-        supabase.from('profiles').select('id').eq('id', user.id).limit(1),
-        'connection health check',
-        healthTimeoutMs
-      ).catch((error) => {
-        throw new Error(`Connection issue: ${error.message}`);
-      });
-
-      const queries = [
-        {
-          key: 'fundSources',
-          label: 'fund_sources query',
-          run: () => supabase.from('fund_sources').select('*').order('created_at'),
-          normalize: (rows) => (rows || []).map(normalizeFundSource)
-        },
-        {
-          key: 'transactions',
-          label: 'transactions query',
-          run: () => supabase.from('transactions').select('*').order('date', { ascending: false }),
-          normalize: (rows) => (rows || []).map(normalizeTransaction)
-        },
-        {
-          key: 'transfers',
-          label: 'transfers query',
-          run: () => supabase.from('transfers').select('*').order('date', { ascending: false }),
-          normalize: (rows) => (rows || []).map(normalizeTransfer)
-        },
-        {
-          key: 'budgets',
-          label: 'budgets query',
-          run: () => supabase.from('budgets').select('*').order('created_at'),
-          normalize: (rows) => (rows || []).map(normalizeBudget)
-        },
-        {
-          key: 'recurringRules',
-          label: 'recurring_rules query',
-          run: () => supabase.from('recurring_rules').select('*').order('created_at'),
-          normalize: (rows) => (rows || []).map(normalizeRecurringRule)
-        },
-        {
-          key: 'settings',
-          label: 'profiles query',
-          run: () => supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-          normalize: (profile) => profile
-            ? {
-                currency: profile.currency,
-                dateFormat: profile.date_format,
-                userName: profile.full_name
-              }
-            : null
-        }
-      ];
-
-      const taskFactories = queries.map((q) => async () => {
-        const result = await withRetryAndTimeout(q.run, q.label, RETRY_DELAYS_MS, queryTimeoutMs);
-        if (result.error) {
-          emitProgress(listeners, { key: q.key, error: result.error });
-          return result;
-        }
-
-        emitProgress(listeners, { key: q.key, data: q.normalize(result.data), error: null });
-        return result;
-      });
-
-      const settled = await runWithConcurrency(taskFactories, QUERY_CONCURRENCY);
-      const loaded = {
-        fundSources: [],
-        transactions: [],
-        transfers: [],
-        budgets: [],
-        recurringRules: [],
-        settings: null
-      };
-      const errors = [];
-
-      settled.forEach((result, index) => {
-        const query = queries[index];
-
-        if (result.status === 'rejected') {
-          errors.push({ key: query.key, error: result.reason });
-          return;
-        }
-
-        const { data, error } = result.value;
-        if (error) {
-          errors.push({ key: query.key, error });
-          return;
-        }
-
-        loaded[query.key] = query.normalize(data);
-      });
-
-      if (errors.length > 0) {
-        console.warn('[Adapter] Bootstrap completed with partial failures:', errors);
-      }
+      const [fundSources, transactions, transfers, budgets, recurringRules] = await Promise.all([
+        request('GET', TABLES.fundSources, null, '?select=*&order=created_at'),
+        request('GET', TABLES.transactions, null, '?select=*&order=date.desc'),
+        request('GET', TABLES.transfers, null, '?select=*&order=date.desc'),
+        request('GET', TABLES.budgets, null, '?select=*&order=created_at'),
+        request('GET', TABLES.recurringRules, null, '?select=*&order=created_at'),
+      ]);
 
       return {
-        ...loaded,
-        loadErrors: errors
+        fundSources: (fundSources || []).map(normalizeFundSource),
+        transactions: (transactions || []).map(normalizeTransaction),
+        transfers: (transfers || []).map(normalizeTransfer),
+        budgets: (budgets || []).map(normalizeBudget),
+        recurringRules: (recurringRules || []).map(normalizeRecurringRule),
+        settings: null
       };
     } catch (error) {
       console.error('Supabase load error:', error);
       throw error;
     }
-    })().finally(() => {
-      activeLoad = null;
-    });
-
-    activeLoad = { promise: loadPromise, listeners };
-    return loadPromise;
   },
 
-  // ── Fund Sources ──────────────────────────────────────────────────────────
-  async insertFundSource(fundSource) {
-    const user = await getCurrentUser();
-    const { data, error } = await supabase
-      .from('fund_sources')
-      .insert({ id: fundSource.id, ...toDbFundSource(fundSource), user_id: user.id })
-      .select().single();
-    if (error) throw error;
-    return data;
-  },
-
-  async updateFundSource(fundSource) {
-    const { data, error } = await supabase
-      .from('fund_sources')
-      .update(toDbFundSource(fundSource))
-      .eq('id', fundSource.id)
-      .select().single();
-    if (error) throw error;
-    return data;
+  async saveFundSource(fundSource) {
+    const dbObj = toDbFundSource(fundSource);
+    if (fundSource.id) {
+      return request('PATCH', TABLES.fundSources, dbObj, `?id=eq.${fundSource.id}`);
+    } else {
+      return request('POST', TABLES.fundSources, dbObj);
+    }
   },
 
   async deleteFundSource(id) {
-    const { error } = await supabase
-      .from('fund_sources')
-      .update({ is_active: false })
-      .eq('id', id);
-    if (error) throw error;
+    return request('DELETE', TABLES.fundSources, null, `?id=eq.${id}`);
   },
 
   // ── Transactions ──────────────────────────────────────────────────────────
   async insertTransaction(transaction) {
-    const user = await getCurrentUser();
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert({ id: transaction.id, ...toDbTransaction(transaction), user_id: user.id })
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('POST', TABLES.transactions, { id: transaction.id, ...toDbTransaction(transaction) });
   },
 
   async updateTransaction(transaction) {
-    const { data, error } = await supabase
-      .from('transactions')
-      .update(toDbTransaction(transaction))
-      .eq('id', transaction.id)
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('PATCH', TABLES.transactions, toDbTransaction(transaction), `?id=eq.${transaction.id}`);
   },
 
   async deleteTransaction(id) {
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    return request('DELETE', TABLES.transactions, null, `?id=eq.${id}`);
+  },
+
+  // ── Fund Sources ──────────────────────────────────────────────────────────
+  async insertFundSource(fundSource) {
+    return request('POST', TABLES.fundSources, { id: fundSource.id, ...toDbFundSource(fundSource) });
+  },
+
+  async updateFundSource(fundSource) {
+    return request('PATCH', TABLES.fundSources, toDbFundSource(fundSource), `?id=eq.${fundSource.id}`);
   },
 
   // ── Transfers ─────────────────────────────────────────────────────────────
   async insertTransfer(transfer) {
-    const user = await getCurrentUser();
-    const { data, error } = await supabase
-      .from('transfers')
-      .insert({ id: transfer.id, ...toDbTransfer(transfer), user_id: user.id })
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('POST', TABLES.transfers, { id: transfer.id, ...toDbTransfer(transfer) });
   },
 
   async deleteTransfer(id) {
-    const { error } = await supabase
-      .from('transfers')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    return request('DELETE', TABLES.transfers, null, `?id=eq.${id}`);
   },
 
   // ── Budgets ───────────────────────────────────────────────────────────────
   async insertBudget(budget) {
-    const user = await getCurrentUser();
-    const { data, error } = await supabase
-      .from('budgets')
-      .insert({ id: budget.id, ...toDbBudget(budget), user_id: user.id })
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('POST', TABLES.budgets, { id: budget.id, ...toDbBudget(budget) });
   },
 
   async updateBudget(budget) {
-    const { data, error } = await supabase
-      .from('budgets')
-      .update(toDbBudget(budget))
-      .eq('id', budget.id)
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('PATCH', TABLES.budgets, toDbBudget(budget), `?id=eq.${budget.id}`);
   },
 
   async deleteBudget(id) {
-    const { error } = await supabase
-      .from('budgets')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    return request('DELETE', TABLES.budgets, null, `?id=eq.${id}`);
   },
 
   // ── Recurring Rules ───────────────────────────────────────────────────────
   async insertRecurringRule(rule) {
-    const user = await getCurrentUser();
-    const { data, error } = await supabase
-      .from('recurring_rules')
-      .insert({ id: rule.id, ...toDbRecurringRule(rule), user_id: user.id })
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('POST', TABLES.recurringRules, { id: rule.id, ...toDbRecurringRule(rule) });
   },
 
   async updateRecurringRule(rule) {
-    const { data, error } = await supabase
-      .from('recurring_rules')
-      .update(toDbRecurringRule(rule))
-      .eq('id', rule.id)
-      .select().single();
-    if (error) throw error;
-    return data;
+    return request('PATCH', TABLES.recurringRules, toDbRecurringRule(rule), `?id=eq.${rule.id}`);
   },
 
-  async deleteRecurringRule(id) {
-    const { error } = await supabase
-      .from('recurring_rules')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-  },
-
-  // ── Settings (Profile) ────────────────────────────────────────────────────
+  // ── Settings ──────────────────────────────────────────────────────────────
   async saveSettings(settings) {
     try {
-      const user = await getCurrentUser();
-      if (!user) return null;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          currency: settings.currency,
-          date_format: settings.dateFormat,
-          full_name: settings.userName
-        })
-        .eq('id', user.id)
-        .select().single();
-      
-      if (error) throw error;
-      return data;
+      const dbObj = toDbSettings(settings);
+      return await request('POST', TABLES.settings, dbObj);
     } catch {
       return null;
     }
+  },
+
+  async subscribe(channel, callback) {
+    return () => {};
   }
 };
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function normalizeFundSource(row) {
   return {
@@ -472,7 +250,9 @@ function normalizeRecurringRule(row) {
 }
 
 function toDbFundSource(fs) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     name: fs.name,
     type: fs.type,
     bank_name: fs.bankName || null,
@@ -483,12 +263,14 @@ function toDbFundSource(fs) {
     color: fs.color,
     icon: fs.icon,
     notes: fs.notes || null,
-    is_active: fs.isActive !== false
+    is_active: fs.isActive
   };
 }
 
 function toDbTransaction(tx) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     title: tx.title,
     amount: tx.amount,
     type: tx.type,
@@ -504,7 +286,9 @@ function toDbTransaction(tx) {
 }
 
 function toDbTransfer(t) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     from_fund_source_id: t.fromFundSourceId,
     to_fund_source_id: t.toFundSourceId,
     amount: t.amount,
@@ -515,7 +299,9 @@ function toDbTransfer(t) {
 }
 
 function toDbBudget(b) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     category: b.category,
     limit_amount: b.limit,
     period: b.period,
@@ -525,7 +311,9 @@ function toDbBudget(b) {
 }
 
 function toDbRecurringRule(r) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     title: r.title,
     amount: r.amount,
     type: r.type,
@@ -533,6 +321,16 @@ function toDbRecurringRule(r) {
     fund_source_id: r.fundSourceId,
     period: r.period,
     next_due_date: r.nextDueDate,
-    is_active: r.isActive !== false
+    is_active: r.isActive
+  };
+}
+
+function toDbSettings(s) {
+  const user = getCurrentUser();
+  return {
+    user_id: user?.id,
+    currency: s.currency,
+    date_format: s.dateFormat,
+    user_name: s.userName
   };
 }

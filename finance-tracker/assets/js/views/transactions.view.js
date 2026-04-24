@@ -10,6 +10,7 @@ import { openModal } from '../components/modal.js';
 import { openDrawer, closeDrawer } from '../components/drawer.js';
 import { CATEGORIES, CR_CATEGORIES, DR_CATEGORIES, CURRENCIES } from '../data/seed.js';
 import { formatCurrency } from '../components/charts.js';
+import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 
 /**
  * Render transactions view
@@ -309,6 +310,8 @@ function updateCategoryOptions() {
 }
 
 function saveTransaction() {
+  if (!canSubmit('transaction-form')) return;
+
   const title = document.getElementById('tx-title')?.value;
   const amount = document.getElementById('tx-amount')?.value;
   const type = document.querySelector('input[name="tx-type"]:checked')?.value;
@@ -342,13 +345,21 @@ function saveTransaction() {
     return;
   }
 
-  TransactionService.add({
-    title, amount, type, category, date, fundSourceId, reference, note, isRecurring, recurringPeriod
-  });
+  const saveBtn = document.getElementById('drawer-save');
+  setButtonLoading(saveBtn, 'Saving...');
+  try {
+    TransactionService.add({
+      title, amount, type, category, date, fundSourceId, reference, note, isRecurring, recurringPeriod
+    });
 
-  closeDrawer();
-  showToast(`Transaction recorded: ${type === 'CR' ? '+' : '-'}${formatCurrency(parseFloat(amount))}`, 'success');
-  renderTransactions();
+    closeDrawer();
+    showToast(`Transaction recorded: ${type === 'CR' ? '+' : '-'}${formatCurrency(parseFloat(amount))}`, 'success');
+    renderTransactions();
+  } catch (error) {
+    showToast(translateError(error), 'error');
+  } finally {
+    setButtonReady(saveBtn);
+  }
 }
 
 // Global function for deletion

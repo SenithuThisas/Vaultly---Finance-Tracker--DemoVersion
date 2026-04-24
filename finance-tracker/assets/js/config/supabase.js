@@ -1,165 +1,114 @@
 /**
- * @fileoverview Supabase client (SDK) + auth helper functions
+ * @fileoverview Supabase client configuration
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-const AUTH_TIMEOUT_MS = 8000;
+const env = import.meta.env;
 
-function withTimeout(promise, label, timeoutMs = AUTH_TIMEOUT_MS) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+const SUPABASE_URL = env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_PUBLISHABLE_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+const SUPABASE_API_KEY = SUPABASE_ANON_KEY || SUPABASE_PUBLISHABLE_KEY;
 
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-  });
+if (!SUPABASE_URL || !SUPABASE_API_KEY) {
+  if (import.meta.env.DEV) console.warn('Supabase not configured...');
 }
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const DEFAULT_HEADERS = {
-  'Accept': 'application/json',
-  'Content-Type': 'application/json'
+const supabaseUrl = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/, '') : '';
+let authRejected = false;
+let healthCheckPromise = null;
+let cachedHealthResult = null;
+
+export const db = isConfigured()
+  ? createClient(SUPABASE_URL, SUPABASE_API_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
+
+function isJwtLikeKey(key) {
+  return typeof key === 'string' && key.split('.').length === 3;
+}
+
+export async function getSupabaseHeaders(withJsonContentType = false) {
+  const headers = {
+    'apikey': SUPABASE_API_KEY
+  };
+
+  let accessToken = null;
+  if (db) {
+    try {
+      const { data } = await db.auth.getSession();
+      accessToken = data?.session?.access_token || null;
+    } catch {
+      accessToken = null;
+    }
+  }
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  } else if (isJwtLikeKey(SUPABASE_API_KEY)) {
+    // Publishable keys (sb_publishable_*) are not JWTs, so skip Bearer for those.
+    headers.Authorization = `Bearer ${SUPABASE_API_KEY}`;
+  }
+
+  if (withJsonContentType) {
+    headers['Content-Type'] = 'application/json';
+    headers.Prefer = 'return=representation';
+  }
+
+  return headers;
+}
+
+export const supabase = {
+  url: supabaseUrl,
+  anonKey: SUPABASE_API_KEY
 };
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('Supabase credentials not set in .env');
-}
-
-/** Supabase client instance */
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true         // catches email confirm + password reset redirects
-  },
-  global: {
-    headers: DEFAULT_HEADERS
-  }
-});
-
-export { SUPABASE_URL };
-
-/** Check if Supabase is configured */
-export function isConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-}
-
-// ─── Auth helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Sign up a new user with email/password
- */
-export async function signUp(email, password, fullName, currency = 'LKR') {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName }        // goes to raw_user_meta_data
-    }
-  });
-  if (error) throw error;
-
-  // Update profile with currency preference (trigger already created the row)
-  if (data.user) {
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      full_name: fullName,
-      currency
-    });
-  }
-
-  return data;
-}
-
-/**
- * Sign in with email + password
- */
-export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Google OAuth sign in
- */
-export async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: window.location.origin }
-  });
-  if (error) throw error;
-}
-
-/**
- * Sign out
- */
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-}
-
-/**
- * Send password reset email
- */
-export async function resetPassword(email) {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}?type=recovery`
-  });
-  if (error) throw error;
-}
-
-/**
- * Update password (when user has a valid session, e.g. from reset link)
- */
-export async function updatePassword(newPassword) {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw error;
-}
-
-/**
- * Get the current user synchronously from cache, or null
- */
-export async function getCurrentUser() {
-  const session = await getSession();
-  return session?.user || null;
-}
-
-/**
- * Get the current session
- */
-export async function getSession() {
-  try {
-    const { data: { session } } = await withTimeout(
-      supabase.auth.getSession(),
-      'auth.getSession'
-    );
-    return session;
-  } catch (error) {
-    console.warn('getSession failed, continuing as signed out:', error?.message || error);
-    return null;
-  }
-}
-
-/**
- * Health check (lightweight)
- */
 export async function checkSupabaseHealth() {
-  if (!isConfigured()) return false;
-  try {
-    const session = await getSession();
-    return Boolean(session);
-  } catch {
+  if (cachedHealthResult !== null) {
+    return cachedHealthResult;
+  }
+
+  if (!isConfigured() || authRejected) {
+    cachedHealthResult = false;
     return false;
   }
+
+  if (healthCheckPromise) {
+    return healthCheckPromise;
+  }
+
+  healthCheckPromise = (async () => {
+    try {
+      // The /rest/v1/ root endpoint requires elevated privileges and returns 401 for anon keys.
+      // Query an actual table with limit=0 — returns 200 even with RLS active.
+      const response = await fetch(`${supabaseUrl}/rest/v1/fund_sources?select=id&limit=0`, {
+        method: 'GET',
+        headers: await getSupabaseHeaders()
+      });
+      if (response.status === 401 || response.status === 403) {
+        authRejected = true;
+      }
+      // 200 means connected; also accept 406 (table exists but header mismatch)
+      cachedHealthResult = response.ok || response.status === 406;
+      return cachedHealthResult;
+    } catch (error) {
+      console.error('Supabase health check failed:', error);
+      cachedHealthResult = false;
+      return false;
+    } finally {
+      healthCheckPromise = null;
+    }
+  })();
+
+  return healthCheckPromise;
+}
+
+export function isConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_API_KEY);
 }

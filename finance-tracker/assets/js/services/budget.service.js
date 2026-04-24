@@ -3,6 +3,7 @@
  */
 
 import { getState, dispatch } from '../state.js';
+import { sanitizeFormData, VALIDATORS, validate } from '../security/index.js';
 
 const uuid = () => crypto.randomUUID();
 
@@ -14,13 +15,27 @@ export const BudgetService = {
    * @returns {Object}
    */
   add(data) {
+    const clean = sanitizeFormData({
+      ...data,
+      limit: parseFloat(data.limit) || 0,
+      period: data.period || 'monthly'
+    });
+    const validation = validate(VALIDATORS.budget, {
+      category: clean.category,
+      limit: clean.limit,
+      period: clean.period
+    });
+    if (!validation.isValid) {
+      throw new Error(Object.values(validation.errors)[0]);
+    }
+
     const newBudget = {
       id: uuid(),
-      category: data.category,
-      limit: parseFloat(data.limit) || 0,
-      period: data.period || 'monthly',
-      fundSourceId: data.fundSourceId || null,
-      color: data.color || '#F4B942',
+      category: clean.category,
+      limit: clean.limit,
+      period: clean.period,
+      fundSourceId: clean.fundSourceId || null,
+      color: clean.color || '#F4B942',
       createdAt: new Date().toISOString()
     };
 
@@ -66,15 +81,12 @@ export const BudgetService = {
     const daysInMonth = monthEnd.getDate();
     const daysLeft = daysInMonth - now.getDate();
 
-    const monthTxs = state.transactions.filter(tx => 
-      tx.type === 'DR' && 
-      new Date(tx.date) >= monthStart && 
-      new Date(tx.date) <= monthEnd
-    );
-
     return state.budgets.map(budget => {
-      const txs = monthTxs.filter(tx =>
+      const txs = state.transactions.filter(tx =>
         tx.category === budget.category &&
+        tx.type === 'DR' &&
+        new Date(tx.date) >= monthStart &&
+        new Date(tx.date) <= monthEnd &&
         (!budget.fundSourceId || tx.fundSourceId === budget.fundSourceId)
       );
 

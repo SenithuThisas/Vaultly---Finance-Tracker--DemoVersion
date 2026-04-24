@@ -3,6 +3,7 @@
  */
 
 import { getState, dispatch } from '../state.js';
+import { sanitizeFormData, VALIDATORS, validate } from '../security/index.js';
 
 const uuid = () => crypto.randomUUID();
 
@@ -14,19 +15,37 @@ export const TransactionService = {
    * @returns {Object}
    */
   add(data) {
+    const clean = sanitizeFormData({
+      ...data,
+      amount: parseFloat(data.amount) || 0
+    });
+
+    const validation = validate(VALIDATORS.transaction, {
+      title: clean.title,
+      amount: clean.amount,
+      type: clean.type,
+      category: clean.category,
+      fundSourceId: clean.fundSourceId,
+      date: clean.date
+    });
+
+    if (!validation.isValid) {
+      throw new Error(Object.values(validation.errors)[0]);
+    }
+
     const newTx = {
       id: uuid(),
-      title: data.title,
-      amount: parseFloat(data.amount) || 0,
-      type: data.type || 'DR',
-      category: data.category,
-      fundSourceId: data.fundSourceId,
-      date: data.date || new Date().toISOString().split('T')[0],
-      reference: data.reference || '',
-      note: data.note || '',
-      tags: data.tags || [],
-      isRecurring: data.isRecurring || false,
-      recurringPeriod: data.recurringPeriod || null,
+      title: clean.title,
+      amount: clean.amount,
+      type: clean.type || 'DR',
+      category: clean.category,
+      fundSourceId: clean.fundSourceId,
+      date: clean.date || new Date().toISOString().split('T')[0],
+      reference: clean.reference || '',
+      note: clean.note || '',
+      tags: clean.tags || [],
+      isRecurring: clean.isRecurring || false,
+      recurringPeriod: clean.recurringPeriod || null,
       createdAt: new Date().toISOString()
     };
 

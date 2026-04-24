@@ -5,223 +5,68 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Vaultly - Personal Finance Tracker</title>
-  <meta name="description" content="Track your finances, budgets, and investments with Vaultly — a modern personal finance dashboard.">
+  <meta name="description"
+    content="Track your finances, budgets, and investments with Vaultly — a modern personal finance dashboard.">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
-  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/components.css">
   <link rel="stylesheet" href="assets/css/charts.css">
   <link rel="stylesheet" href="assets/css/responsive.css">
-  <link rel="stylesheet" href="assets/css/auth.css">
   <script type="module" src="assets/js/app.js"></script>
 </head>
 
 <body>
-  <!-- ════ Auth Wrapper ════ -->
-  <div id="auth-wrapper" class="hidden">
-    <div class="auth-container">
-      <!-- Left side (branding) -->
-      <div class="auth-brand">
-        <div class="auth-brand-logo">🔐</div>
-        <h1>Vaultly</h1>
-        <p class="tagline">Your personal finance vault</p>
-        <div class="auth-features">
-          <div class="auth-feature">
-            <div class="auth-feature-icon">🏦</div>
-            <span>Track all your bank accounts</span>
-          </div>
-          <div class="auth-feature">
-            <div class="auth-feature-icon">📊</div>
-            <span>Monitor budgets & spending</span>
-          </div>
-          <div class="auth-feature">
-            <div class="auth-feature-icon">🔒</div>
-            <span>Your data, private & secure</span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Right side (forms) -->
-      <div class="auth-form-panel">
-        <div class="auth-form-card">
-          <div class="auth-mobile-logo">
-            <div class="brand-icon">🔐</div>
-            <h2>Vaultly</h2>
-          </div>
-          
-          <!-- Login View -->
-          <div id="auth-login" class="auth-view active">
-            <div class="auth-header">
-              <h2>Welcome back</h2>
-              <p>Sign in to your vault</p>
-            </div>
-            <div id="login-alert" class="auth-alert"></div>
-            <form id="login-form">
-              <div class="auth-input-group">
-                <span class="auth-input-icon">✉️</span>
-                <input type="email" id="login-email" class="auth-input" placeholder="your@email.com" required autofocus>
-              </div>
-              <div class="auth-input-group">
-                <span class="auth-input-icon">🔑</span>
-                <input type="password" id="login-password" class="auth-input" placeholder="••••••••" required>
-                <button type="button" class="auth-pw-toggle" tabindex="-1">👁️</button>
-              </div>
-              <div class="auth-inline">
-                <label class="auth-checkbox">
-                  <input type="checkbox" id="login-remember" checked>
-                  Remember me
-                </label>
-                <a class="auth-link" id="show-forgot">Forgot password?</a>
-              </div>
-              <button type="submit" id="login-submit" class="auth-btn-primary">Sign In to Vault</button>
-            </form>
-            <div class="auth-divider">or</div>
-            <button type="button" id="google-login-btn" class="auth-btn-google">
-              <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-              Continue with Google
-            </button>
-            <div class="auth-footer">
-              Don't have an account? <a class="auth-link" id="show-register">Create one &rarr;</a>
-            </div>
-          </div>
-          
-          <!-- Register View -->
-          <div id="auth-register" class="auth-view">
-            <div class="auth-header">
-              <h2>Create your vault</h2>
-              <p>Free forever. No credit card required.</p>
-            </div>
-            <div id="register-alert" class="auth-alert"></div>
-            <form id="register-form">
-              <div class="auth-input-group">
-                <span class="auth-input-icon">👤</span>
-                <input type="text" id="register-name" class="auth-input" placeholder="Full Name" required minlength="2">
-              </div>
-              <div class="auth-input-group">
-                <span class="auth-input-icon">✉️</span>
-                <input type="email" id="register-email" class="auth-input" placeholder="your@email.com" required>
-              </div>
-              <div class="auth-input-group" style="margin-bottom: 24px;">
-                <span class="auth-input-icon">🔑</span>
-                <input type="password" id="register-password" class="auth-input" placeholder="Create password (min 8 chars)" required minlength="8">
-                <button type="button" class="auth-pw-toggle" tabindex="-1">👁️</button>
-              </div>
-              <div class="pw-strength">
-                <div class="pw-strength-bar">
-                  <div class="pw-strength-seg"></div>
-                  <div class="pw-strength-seg"></div>
-                  <div class="pw-strength-seg"></div>
-                  <div class="pw-strength-seg"></div>
-                </div>
-                <div class="pw-strength-label" id="pw-strength-label"></div>
-              </div>
-              <div class="auth-input-group" style="margin-bottom: 24px;">
-                <span class="auth-input-icon">🔑</span>
-                <input type="password" id="register-password-confirm" class="auth-input" placeholder="Confirm password" required>
-              </div>
-              <div id="pw-match-indicator" class="pw-match"></div>
-              <select id="register-currency" class="auth-select">
-                <option value="LKR">LKR - Sri Lankan Rupee</option>
-                <option value="USD">USD - US Dollar</option>
-                <option value="EUR">EUR - Euro</option>
-                <option value="GBP">GBP - British Pound</option>
-                <option value="INR">INR - Indian Rupee</option>
-                <option value="SGD">SGD - Singapore Dollar</option>
-              </select>
-              <label class="auth-checkbox" style="margin-bottom: 20px;">
-                <input type="checkbox" id="register-terms" required>
-                I agree to the Terms of Service and Privacy Policy
-              </label>
-              <button type="submit" id="register-submit" class="auth-btn-primary">Create My Vault</button>
-            </form>
-            <div class="auth-divider">or</div>
-            <button type="button" id="google-register-btn" class="auth-btn-google">
-              <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-              Sign up with Google
-            </button>
-            <div class="auth-footer">
-              Already have an account? <a class="auth-link" id="show-login">Sign in &rarr;</a>
-            </div>
-          </div>
-          
-          <!-- Confirm Email View -->
-          <div id="auth-confirm" class="auth-view auth-success-screen">
-            <div class="auth-success-icon">✉️</div>
-            <h3>Check your email</h3>
-            <p>We sent a confirmation link to<br><strong id="confirm-email-address" style="color:#E6EDF3"></strong></p>
-            <p style="margin-bottom: 24px;">Click the link to activate your vault.</p>
-            <button id="resend-email-btn" class="auth-resend-btn">Resend Email</button>
-            <div class="auth-footer" style="margin-top: 32px;">
-              <a class="auth-link" id="show-login-2">&larr; Back to sign in</a>
-            </div>
-          </div>
-          
-          <!-- Forgot Password View -->
-          <div id="auth-forgot" class="auth-view">
-            <div class="auth-header">
-              <h2>Reset password</h2>
-              <p>Enter your email to receive a reset link</p>
-            </div>
-            <div id="forgot-alert" class="auth-alert"></div>
-            <form id="forgot-form">
-              <div class="auth-input-group" style="margin-bottom: 24px;">
-                <span class="auth-input-icon">✉️</span>
-                <input type="email" id="forgot-email" class="auth-input" placeholder="your@email.com" required>
-              </div>
-              <button type="submit" id="forgot-submit" class="auth-btn-primary">Send Reset Link</button>
-            </form>
-            <div class="auth-footer">
-              <a class="auth-link" id="back-to-login">&larr; Back to sign in</a>
-            </div>
-          </div>
-          
-          <!-- Reset New Password View (from email link) -->
-          <div id="auth-reset-pw" class="auth-view">
-            <div class="auth-header">
-              <h2>Set new password</h2>
-              <p>Enter your new password below</p>
-            </div>
-            <div id="reset-pw-alert" class="auth-alert"></div>
-            <form id="reset-pw-form">
-              <div class="auth-input-group" style="margin-bottom: 20px;">
-                <span class="auth-input-icon">🔑</span>
-                <input type="password" id="reset-new-password" class="auth-input" placeholder="New password" required minlength="8">
-                <button type="button" class="auth-pw-toggle" tabindex="-1">👁️</button>
-              </div>
-              <div class="auth-input-group" style="margin-bottom: 24px;">
-                <span class="auth-input-icon">🔑</span>
-                <input type="password" id="reset-new-password-confirm" class="auth-input" placeholder="Confirm new password" required minlength="8">
-              </div>
-              <button type="submit" id="reset-pw-submit" class="auth-btn-primary">Update Password</button>
-            </form>
-          </div>
-          
-        </div>
-      </div>
+  <div class="app-loading-screen" id="app-loading-screen">
+    <div class="loading-card">
+      <div class="loading-lock">LOCK</div>
+      <h2>Securing Vaultly</h2>
+      <p>Validating your encrypted session...</p>
     </div>
   </div>
 
-  <!-- ════ Loading Screen ════ -->
-  <div id="loading-screen" class="hidden">
-    <div class="brand">Vaultly</div>
-    <div class="loading-bar">
-      <div class="loading-bar-fill"></div>
+  <div class="auth-screen" id="auth-screen">
+    <canvas id="auth-canvas"></canvas>
+    <div class="auth-card">
+      <h2>Welcome to Vaultly</h2>
+      <p>Sign in to access your financial workspace.</p>
+      <form id="auth-form" class="auth-form">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input id="auth-email" type="email" class="form-input" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input id="auth-password" type="password" class="form-input" autocomplete="current-password" required>
+        </div>
+        <div class="auth-error" id="auth-error"></div>
+        <button type="submit" class="btn btn-primary" id="auth-submit-btn">Sign In</button>
+        <div style="text-align: center; margin-top: 1rem;">
+          <button type="button" class="auth-muted-link" id="auth-toggle-mode-btn">Don't have an account? Sign Up</button>
+        </div>
+      </form>
+      <a href="#" id="auth-signout-link" class="auth-muted-link">Sign out all other sessions</a>
     </div>
-    <div id="loading-text">Loading your vault...</div>
   </div>
 
-  <!-- ════ App Shell ════ -->
-  <div id="app-shell" class="hidden">
-    <!-- Sidebar backdrop -->
-  <div class="mobile-overlay" id="mobile-overlay"></div>
+  <div class="offline-banner" id="offline-banner">
+    <span>You are offline. Changes will sync when reconnected.</span>
+    <button id="dismiss-offline-banner" aria-label="Dismiss offline banner">x</button>
+  </div>
+
+  <!-- Sidebar backdrop -->
+  <div class="mobile-overlay" id="mobile-overlay" data-app-shell></div>
 
   <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
+  <aside class="sidebar" id="sidebar" data-app-shell>
     <div class="logo">
       <h1>Vaultly</h1>
       <span>Finance Tracker</span>
@@ -284,11 +129,19 @@
         </svg>
         <span class="nav-link-text">Settings</span>
       </button>
+      <button class="nav-link text-danger" id="sidebar-signout-btn" data-tooltip="Sign Out" style="color: var(--accent-red); margin-top: 4px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        <span class="nav-link-text">Sign Out</span>
+      </button>
     </div>
   </aside>
 
   <!-- Main content wrapper -->
-  <div class="main-wrapper">
+  <div class="main-wrapper" data-app-shell>
     <!-- Mobile top bar (visible only <768px) -->
     <header class="mobile-top-bar" id="mobile-top-bar">
       <button class="hamburger" id="hamburger" aria-label="Open menu">☰</button>
@@ -319,17 +172,20 @@
   </div>
 
   <!-- Bottom Tab Bar (mobile) -->
-  <nav class="bottom-tab-bar" id="bottom-tab-bar">
+  <nav class="bottom-tab-bar" id="bottom-tab-bar" data-app-shell>
     <button class="tab-item active" data-view="dashboard">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" />
-        <rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" />
+        <rect x="3" y="3" width="7" height="9" rx="1" />
+        <rect x="14" y="3" width="7" height="5" rx="1" />
+        <rect x="14" y="12" width="7" height="9" rx="1" />
+        <rect x="3" y="16" width="7" height="5" rx="1" />
       </svg>
       Home
     </button>
     <button class="tab-item" data-view="banks">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M12 4v16" />
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <path d="M12 4v16" />
       </svg>
       Accounts
     </button>
@@ -341,20 +197,24 @@
     </button>
     <button class="tab-item" data-view="budgets">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /><path d="M12 3v18" />
+        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
+        <path d="M12 3v18" />
       </svg>
       Budgets
     </button>
     <button class="tab-item" data-view="analytics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+        <path d="M3 3v18h18" />
+        <path d="M18 17V9" />
+        <path d="M13 17V5" />
+        <path d="M8 17v-3" />
       </svg>
       Analytics
     </button>
   </nav>
 
   <!-- Modal -->
-  <div class="modal-overlay" id="modal-overlay">
+  <div class="modal-overlay" id="modal-overlay" data-app-shell>
     <div class="modal">
       <div class="modal-header">
         <h3 class="modal-title" id="modal-title"></h3>
@@ -369,8 +229,8 @@
   </div>
 
   <!-- Drawer -->
-  <div class="drawer-overlay" id="drawer-overlay"></div>
-  <div class="drawer" id="tx-drawer">
+  <div class="drawer-overlay" id="drawer-overlay" data-app-shell></div>
+  <div class="drawer" id="tx-drawer" data-app-shell>
     <div class="drawer-drag-handle"></div>
     <div class="drawer-header">
       <h3 class="drawer-title" id="drawer-title">Add Transaction</h3>
@@ -381,10 +241,10 @@
   </div>
 
   <!-- Toast -->
-  <div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toast-container" data-app-shell></div>
 
   <!-- Search -->
-  <div class="search-overlay" id="search-overlay">
+  <div class="search-overlay" id="search-overlay" data-app-shell>
     <div class="search-box">
       <input type="text" class="search-input" id="search-input" placeholder="Search transactions, accounts...">
       <div class="search-results" id="search-results"></div>
@@ -392,7 +252,27 @@
   </div>
 
   <!-- FAB -->
-  <button class="fab" id="add-fab" aria-label="Add transaction">+</button>
+  <button class="fab" id="add-fab" aria-label="Add transaction" data-app-shell>+</button>
+
+  <div class="lock-screen" id="lock-screen">
+    <div class="lock-card">
+      <div class="lock-icon">LOCK</div>
+      <h3>Vaultly Locked</h3>
+      <p>Locked due to inactivity</p>
+      <input id="lock-secret-input" class="form-input" type="password" placeholder="Enter your password">
+      <div class="lock-error" id="lock-error"></div>
+      <button class="btn btn-primary" id="lock-unlock-btn">Unlock</button>
+      <button class="auth-muted-link" id="lock-signout-btn" type="button">Sign out instead</button>
+    </div>
+  </div>
+
+  <div class="session-expired-overlay" id="session-expired-overlay">
+    <div class="session-expired-modal">
+      <div class="session-lock">LOCK</div>
+      <h3>Session Expired</h3>
+      <p>Your session has expired for security. Please sign in again to continue.</p>
+      <button class="btn btn-primary" id="session-expired-signin-btn">Sign In Again</button>
+    </div>
   </div>
 </body>
 

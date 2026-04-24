@@ -2,121 +2,38 @@
  * @fileoverview Storage layer — Supabase only.
  */
 
-import { isConfigured } from './config/supabase.js';
+import { isConfigured, checkSupabaseHealth } from './config/supabase.js';
 import { supabaseAdapter } from './adapters/supabase.adapter.js';
+import { withRetry, runOnlineAware, logSecurityEvent } from './security/index.js';
 
-const BOOTSTRAP_CACHE_KEY = 'vaultly.bootstrap.cache.v1';
-const CACHED_DATA_TIMEOUT_MS = 20000;
-const LIVE_DATA_TIMEOUT_MS = 12000;
+let adapterReady = false;
+
+// ─── Adapter selection ────────────────────────────────────────────────────────
+
+async function ensureAdapter() {
+  if (adapterReady) return;
+
+  if (isConfigured() && await checkSupabaseHealth()) {
+    adapterReady = true;
+    console.log('Using Supabase adapter');
+  } else {
+    console.warn('Supabase is not available — data will not be persisted.');
+  }
+}
 
 export function isUsingCloud() {
-  return isConfigured();
-}
-
-export function getCachedBootstrap(userId = null) {
-  if (typeof window === 'undefined' || !window.localStorage) return null;
-
-  try {
-    const raw = window.localStorage.getItem(BOOTSTRAP_CACHE_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw);
-    const payload = parsed?.payload;
-    if (!payload) return null;
-
-    if (userId && parsed?.userId && parsed.userId !== userId) {
-      return null;
-    }
-
-    return {
-      ...payload,
-      cacheTimestamp: parsed.cachedAt || null,
-      fromCache: true
-    };
-  } catch (error) {
-    console.warn('Failed to read bootstrap cache:', error);
-    return null;
-  }
-}
-
-function saveBootstrapCache(userId, payload) {
-  if (typeof window === 'undefined' || !window.localStorage || !payload) return;
-
-  try {
-    window.localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({
-      userId: userId || null,
-      cachedAt: Date.now(),
-      payload: {
-        fundSources: payload.fundSources || [],
-        transactions: payload.transactions || [],
-        transfers: payload.transfers || [],
-        budgets: payload.budgets || [],
-        recurringRules: payload.recurringRules || [],
-        settings: payload.settings || null,
-        loadErrors: payload.loadErrors || []
-      }
-    }));
-  } catch (error) {
-    console.warn('Failed to save bootstrap cache:', error);
-  }
-}
-
-function emitCachedProgress(onProgress, cached) {
-  if (!onProgress || !cached) return;
-
-  onProgress({ key: 'fundSources', data: cached.fundSources || [], error: null, source: 'cache' });
-  onProgress({ key: 'transactions', data: cached.transactions || [], error: null, source: 'cache' });
-  onProgress({ key: 'transfers', data: cached.transfers || [], error: null, source: 'cache' });
-  onProgress({ key: 'budgets', data: cached.budgets || [], error: null, source: 'cache' });
-  onProgress({ key: 'recurringRules', data: cached.recurringRules || [], error: null, source: 'cache' });
-  onProgress({ key: 'settings', data: cached.settings || null, error: null, source: 'cache' });
+  return adapterReady;
 }
 
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
-export async function load(user = null, options = {}) {
-  const {
-    onProgress,
-    onBackgroundRefresh,
-    backgroundRefresh = true,
-    forceRefresh = false,
-    healthTimeoutMs = 3000
-  } = options;
+export async function load() {
+  await ensureAdapter();
 
-  const userId = user?.id || null;
-  const cached = forceRefresh ? null : getCachedBootstrap(userId);
-
-  if (cached) {
-    emitCachedProgress(onProgress, cached);
-
-    if (backgroundRefresh && isConfigured()) {
-      supabaseAdapter.load(user, {
-        onProgress,
-        healthTimeoutMs,
-        queryTimeoutMs: LIVE_DATA_TIMEOUT_MS
-      }).then((fresh) => {
-        if (!fresh) return;
-        saveBootstrapCache(userId, fresh);
-        onBackgroundRefresh?.(fresh);
-      }).catch((error) => {
-        console.warn('Background refresh failed:', error);
-      });
-    }
-
-    return cached;
-  }
-
-  if (isConfigured()) {
+  if (adapterReady) {
     try {
-      const data = await supabaseAdapter.load(user, {
-        onProgress,
-        healthTimeoutMs,
-        queryTimeoutMs: options.queryTimeoutMs || CACHED_DATA_TIMEOUT_MS
-      });
-      if (data) {
-        saveBootstrapCache(userId, data);
-        return data;
-      }
+      const data = await supabaseAdapter.load();
+      if (data) return data;
     } catch (e) {
       console.error('Supabase load failed:', e);
     }
@@ -133,58 +50,54 @@ export async function load(user = null, options = {}) {
  * payload: the record or id
  */
 export async function saveRecord(action, payload) {
-  if (!isConfigured()) return;
+  if (!adapterReady) return;
 
-  try {
+  const operation = async () => {
     switch (action) {
       case 'ADD_FUND_SOURCE':
-        await supabaseAdapter.insertFundSource(payload);
-        break;
+        return supabaseAdapter.insertFundSource(payload);
       case 'EDIT_FUND_SOURCE':
-        await supabaseAdapter.updateFundSource(payload);
-        break;
+        return supabaseAdapter.updateFundSource(payload);
       case 'DELETE_FUND_SOURCE':
-        await supabaseAdapter.deleteFundSource(payload);
-        break;
+        return supabaseAdapter.deleteFundSource(payload);
       case 'ADD_TRANSACTION':
-        await supabaseAdapter.insertTransaction(payload);
-        break;
+        return supabaseAdapter.insertTransaction(payload);
       case 'EDIT_TRANSACTION':
-        await supabaseAdapter.updateTransaction(payload);
-        break;
+        return supabaseAdapter.updateTransaction(payload);
       case 'DELETE_TRANSACTION':
-        await supabaseAdapter.deleteTransaction(payload);
-        break;
+        return supabaseAdapter.deleteTransaction(payload);
       case 'ADD_TRANSFER':
-        await supabaseAdapter.insertTransfer(payload);
-        break;
+        return supabaseAdapter.insertTransfer(payload);
       case 'DELETE_TRANSFER':
-        await supabaseAdapter.deleteTransfer(payload);
-        break;
+        return supabaseAdapter.deleteTransfer(payload);
       case 'ADD_BUDGET':
-        await supabaseAdapter.insertBudget(payload);
-        break;
+        return supabaseAdapter.insertBudget(payload);
       case 'EDIT_BUDGET':
-        await supabaseAdapter.updateBudget(payload);
-        break;
+        return supabaseAdapter.updateBudget(payload);
       case 'DELETE_BUDGET':
-        await supabaseAdapter.deleteBudget(payload);
-        break;
+        return supabaseAdapter.deleteBudget(payload);
       case 'ADD_RECURRING_RULE':
-        await supabaseAdapter.insertRecurringRule(payload);
-        break;
+        return supabaseAdapter.insertRecurringRule(payload);
       case 'EDIT_RECURRING_RULE':
-        await supabaseAdapter.updateRecurringRule(payload);
-        break;
+        return supabaseAdapter.updateRecurringRule(payload);
       case 'UPDATE_SETTINGS':
-        await supabaseAdapter.saveSettings(payload);
-        break;
+        return supabaseAdapter.saveSettings(payload);
       default:
-        break;
+        return null;
     }
+  };
+
+  try {
+    await runOnlineAware(() => withRetry(operation, 3, 1000), { action, payload });
   } catch (err) {
+    logSecurityEvent({
+      type: 'STORAGE_WRITE_FAILED',
+      details: {
+        action,
+        message: err?.message || String(err)
+      }
+    });
     console.error(`Supabase write failed for ${action}:`, err);
-    throw err;
   }
 }
 
@@ -209,6 +122,7 @@ export function exportAllCSV(transactions, fundSources) {
 
   const csv = [headers.join(','), ...rows].join('\n');
   _downloadFile(csv, `vaultly-export-${_dateString()}.csv`, 'text/csv');
+  logSecurityEvent({ type: 'DATA_EXPORTED', details: { format: 'csv' } });
 }
 
 export function exportAccountCSV(fundSource, transactions) {
@@ -236,7 +150,14 @@ export function exportAccountCSV(fundSource, transactions) {
 }
 
 export function exportJSON(state) {
-  _downloadFile(JSON.stringify(state, null, 2), `vaultly-backup-${_dateString()}.json`, 'application/json');
+  const sanitized = {
+    ...state,
+    auth: undefined,
+    session: undefined,
+    token: undefined
+  };
+  _downloadFile(JSON.stringify(sanitized, null, 2), `vaultly-export-${_dateString()}.json`, 'application/json');
+  logSecurityEvent({ type: 'DATA_EXPORTED', details: { format: 'json' } });
 }
 
 export function importJSON(jsonString) {

@@ -3,6 +3,7 @@
  */
 
 import { getState, dispatch } from '../state.js';
+import { sanitizeFormData } from '../security/index.js';
 
 const uuid = () => crypto.randomUUID();
 
@@ -14,14 +15,26 @@ export const TransferService = {
    * @returns {Object}
    */
   add(data) {
+    const clean = sanitizeFormData({
+      ...data,
+      amount: parseFloat(data.amount) || 0,
+      fee: parseFloat(data.fee) || 0
+    });
+    if (!clean.fromFundSourceId || !clean.toFundSourceId || clean.fromFundSourceId === clean.toFundSourceId) {
+      throw new Error('Invalid transfer accounts');
+    }
+    if (!Number.isFinite(clean.amount) || clean.amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
+
     const newTransfer = {
       id: uuid(),
-      fromFundSourceId: data.fromFundSourceId,
-      toFundSourceId: data.toFundSourceId,
-      amount: parseFloat(data.amount) || 0,
-      date: data.date || new Date().toISOString().split('T')[0],
-      note: data.note || '',
-      fee: parseFloat(data.fee) || 0,
+      fromFundSourceId: clean.fromFundSourceId,
+      toFundSourceId: clean.toFundSourceId,
+      amount: clean.amount,
+      date: clean.date || new Date().toISOString().split('T')[0],
+      note: clean.note || '',
+      fee: clean.fee,
       createdAt: new Date().toISOString()
     };
 

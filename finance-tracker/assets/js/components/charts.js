@@ -36,8 +36,6 @@ export function formatPct(n) {
  * @param {Array} data - Array of {label, cr, dr, net}
  */
 export function drawCashflowChart(container, data) {
-  if (!container) return;
-
   if (!data || data.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">No data available</div></div>';
     return;
@@ -91,8 +89,6 @@ export function drawCashflowChart(container, data) {
  * @param {number} [total]
  */
 export function drawDonutChart(container, legendContainer, data, total) {
-  if (!container || !legendContainer) return;
-
   if (!data || data.length === 0 || total === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">🥧</div><div class="empty-text">No spending data</div></div>';
     legendContainer.innerHTML = '';
@@ -155,8 +151,6 @@ export function drawDonutChart(container, legendContainer, data, total) {
  * @param {string} [color='#F4B942']
  */
 export function drawLineChart(container, values, labels, color = '#F4B942') {
-  if (!container) return;
-
   if (!values || values.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📈</div><div class="empty-text">No data</div></div>';
     return;
@@ -211,8 +205,6 @@ export function drawLineChart(container, values, labels, color = '#F4B942') {
  * @param {number} [maxValue]
  */
 export function drawBarChart(container, data, maxValue) {
-  if (!container) return;
-
   if (!data || data.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">No data</div></div>';
     return;
@@ -249,8 +241,6 @@ export function drawBarChart(container, data, maxValue) {
  * @param {string} [color='#10B981']
  */
 export function drawSparkline(container, data, color = '#10B981') {
-  if (!container) return;
-
   if (!data || data.length === 0) {
     container.innerHTML = '';
     return;

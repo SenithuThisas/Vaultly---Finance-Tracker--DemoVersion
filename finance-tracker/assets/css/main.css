@@ -165,10 +165,6 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.3; }
   to { transform: translateX(0); }
 }
 
-.hidden {
-  display: none !important;
-}
-
 @keyframes slideUpSheet {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
@@ -196,4 +192,199 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.3; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.hidden-shell {
+  display: none !important;
+}
+
+.app-loading-screen,
+.auth-screen,
+.lock-screen,
+.session-expired-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: rgba(8, 10, 14, 0.94);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.app-loading-screen.open,
+.auth-screen.open,
+.lock-screen.open,
+.session-expired-overlay.open {
+  display: flex;
+}
+
+.loading-card,
+.auth-card,
+.lock-card,
+.session-expired-modal {
+  width: min(420px, 100%);
+  background: linear-gradient(160deg, #101418, #0a0d11);
+  border: 1px solid rgba(244, 185, 66, 0.22);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  padding: 28px;
+}
+
+/* ── Custom Auth Screen Overrides for WebGL ── */
+.auth-screen {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+#auth-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none; /* Let clicks pass through if needed, though mousemove is on window */
+}
+
+.auth-card {
+  background: rgba(13, 13, 16, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+/* ──────────────────────────────────────────── */
+
+.loading-lock,
+.lock-icon,
+.session-lock {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-gold);
+  color: var(--accent-gold);
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  animation: pulse 1.2s ease-in-out infinite;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.auth-card h2,
+.loading-card h2,
+.lock-card h3,
+.session-expired-modal h3 {
+  margin-bottom: 6px;
+}
+
+.auth-card p,
+.loading-card p,
+.lock-card p,
+.session-expired-modal p {
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.auth-form .btn,
+.lock-card .btn,
+.session-expired-modal .btn {
+  width: 100%;
+}
+
+.auth-error,
+.lock-error {
+  color: #ff8f8f;
+  font-size: 12px;
+  margin: 8px 0 10px;
+  min-height: 16px;
+  display: none;
+}
+
+.lock-error.visible,
+.auth-error:not(:empty) {
+  display: block;
+}
+
+.auth-muted-link {
+  margin-top: 12px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #e6b450;
+  color: #201a0f;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.offline-banner.visible {
+  display: flex;
+}
+
+.offline-banner button {
+  color: inherit;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.security-panel {
+  background: rgba(244, 185, 66, 0.08);
+  border: 1px solid rgba(244, 185, 66, 0.2);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 18px 0;
+}
+
+.security-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.shake {
+  animation: shake 0.35s linear;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.lock-screen {
+  z-index: 99999;
 }

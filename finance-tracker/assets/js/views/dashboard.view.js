@@ -82,10 +82,7 @@ export function renderDashboard() {
 
   // Draw charts
   setTimeout(() => {
-    const cashflowEl = document.getElementById('cashflow-chart');
-    if (!cashflowEl) return;
-
-    drawCashflowChart(cashflowEl, TransactionService.getMonthlyTotals(6));
+    drawCashflowChart(document.getElementById('cashflow-chart'), TransactionService.getMonthlyTotals(6));
     renderDonut();
     renderRecentTransactions();
     renderBudgetHealth();
@@ -93,10 +90,6 @@ export function renderDashboard() {
 }
 
 function renderDonut() {
-  const donutEl = document.getElementById('donut-chart');
-  const legendEl = document.getElementById('donut-legend');
-  if (!donutEl || !legendEl) return;
-
   const now = new Date();
   const txs = TransactionService.getByMonth(now.getFullYear(), now.getMonth());
   const categoryTotals = TransactionService.getCategoryTotals(txs);
@@ -111,7 +104,12 @@ function renderDonut() {
 
   const total = categories.reduce((s, c) => s + c.amount, 0);
 
-  drawDonutChart(donutEl, legendEl, categories, total);
+  drawDonutChart(
+    document.getElementById('donut-chart'),
+    document.getElementById('donut-legend'),
+    categories,
+    total
+  );
 }
 
 function renderRecentTransactions() {
