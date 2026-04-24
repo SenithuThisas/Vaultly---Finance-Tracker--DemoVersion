@@ -3,6 +3,7 @@
  */
 
 import { supabase, isConfigured, getSupabaseHeaders } from '../config/supabase.js';
+import { getCurrentUser } from '../security/session.js';
 
 const TABLES = {
   fundSources: 'fund_sources',
@@ -13,7 +14,7 @@ const TABLES = {
   settings: 'user_settings'
 };
 
-function getHeaders() {
+async function getHeaders() {
   return getSupabaseHeaders(true);
 }
 
@@ -23,7 +24,7 @@ async function request(method, table, body = null, query = '') {
   }
 
   const url = `${supabase.url}/rest/v1/${table}${query}`;
-  const headers = getHeaders();
+  const headers = await getHeaders();
 
   // DELETE requests must not include a body or Prefer: return=representation
   if (method === 'DELETE') {
@@ -42,8 +43,19 @@ async function request(method, table, body = null, query = '') {
   if (response.status === 204) return null;
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Supabase error: ${response.status} - ${error}`);
+    const errorText = await response.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(errorText);
+    } catch {
+      parsed = null;
+    }
+
+    const err = new Error(parsed?.message || `Supabase error: ${response.status}`);
+    err.status = response.status;
+    err.code = parsed?.code || null;
+    err.details = parsed?.details || errorText;
+    throw err;
   }
 
   const text = await response.text();
@@ -238,7 +250,9 @@ function normalizeRecurringRule(row) {
 }
 
 function toDbFundSource(fs) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     name: fs.name,
     type: fs.type,
     bank_name: fs.bankName || null,
@@ -254,7 +268,9 @@ function toDbFundSource(fs) {
 }
 
 function toDbTransaction(tx) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     title: tx.title,
     amount: tx.amount,
     type: tx.type,
@@ -270,7 +286,9 @@ function toDbTransaction(tx) {
 }
 
 function toDbTransfer(t) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     from_fund_source_id: t.fromFundSourceId,
     to_fund_source_id: t.toFundSourceId,
     amount: t.amount,
@@ -281,7 +299,9 @@ function toDbTransfer(t) {
 }
 
 function toDbBudget(b) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     category: b.category,
     limit_amount: b.limit,
     period: b.period,
@@ -291,7 +311,9 @@ function toDbBudget(b) {
 }
 
 function toDbRecurringRule(r) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     title: r.title,
     amount: r.amount,
     type: r.type,
@@ -304,7 +326,9 @@ function toDbRecurringRule(r) {
 }
 
 function toDbSettings(s) {
+  const user = getCurrentUser();
   return {
+    user_id: user?.id,
     currency: s.currency,
     date_format: s.dateFormat,
     user_name: s.userName

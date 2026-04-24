@@ -4,6 +4,7 @@
 
 import { isConfigured, checkSupabaseHealth } from './config/supabase.js';
 import { supabaseAdapter } from './adapters/supabase.adapter.js';
+import { withRetry, runOnlineAware, logSecurityEvent } from './security/index.js';
 
 let adapterReady = false;
 
@@ -51,54 +52,51 @@ export async function load() {
 export async function saveRecord(action, payload) {
   if (!adapterReady) return;
 
-  try {
+  const operation = async () => {
     switch (action) {
       case 'ADD_FUND_SOURCE':
-        await supabaseAdapter.insertFundSource(payload);
-        break;
+        return supabaseAdapter.insertFundSource(payload);
       case 'EDIT_FUND_SOURCE':
-        await supabaseAdapter.updateFundSource(payload);
-        break;
+        return supabaseAdapter.updateFundSource(payload);
       case 'DELETE_FUND_SOURCE':
-        await supabaseAdapter.deleteFundSource(payload);
-        break;
+        return supabaseAdapter.deleteFundSource(payload);
       case 'ADD_TRANSACTION':
-        await supabaseAdapter.insertTransaction(payload);
-        break;
+        return supabaseAdapter.insertTransaction(payload);
       case 'EDIT_TRANSACTION':
-        await supabaseAdapter.updateTransaction(payload);
-        break;
+        return supabaseAdapter.updateTransaction(payload);
       case 'DELETE_TRANSACTION':
-        await supabaseAdapter.deleteTransaction(payload);
-        break;
+        return supabaseAdapter.deleteTransaction(payload);
       case 'ADD_TRANSFER':
-        await supabaseAdapter.insertTransfer(payload);
-        break;
+        return supabaseAdapter.insertTransfer(payload);
       case 'DELETE_TRANSFER':
-        await supabaseAdapter.deleteTransfer(payload);
-        break;
+        return supabaseAdapter.deleteTransfer(payload);
       case 'ADD_BUDGET':
-        await supabaseAdapter.insertBudget(payload);
-        break;
+        return supabaseAdapter.insertBudget(payload);
       case 'EDIT_BUDGET':
-        await supabaseAdapter.updateBudget(payload);
-        break;
+        return supabaseAdapter.updateBudget(payload);
       case 'DELETE_BUDGET':
-        await supabaseAdapter.deleteBudget(payload);
-        break;
+        return supabaseAdapter.deleteBudget(payload);
       case 'ADD_RECURRING_RULE':
-        await supabaseAdapter.insertRecurringRule(payload);
-        break;
+        return supabaseAdapter.insertRecurringRule(payload);
       case 'EDIT_RECURRING_RULE':
-        await supabaseAdapter.updateRecurringRule(payload);
-        break;
+        return supabaseAdapter.updateRecurringRule(payload);
       case 'UPDATE_SETTINGS':
-        await supabaseAdapter.saveSettings(payload);
-        break;
+        return supabaseAdapter.saveSettings(payload);
       default:
-        break;
+        return null;
     }
+  };
+
+  try {
+    await runOnlineAware(() => withRetry(operation, 3, 1000), { action, payload });
   } catch (err) {
+    logSecurityEvent({
+      type: 'STORAGE_WRITE_FAILED',
+      details: {
+        action,
+        message: err?.message || String(err)
+      }
+    });
     console.error(`Supabase write failed for ${action}:`, err);
   }
 }
@@ -124,6 +122,7 @@ export function exportAllCSV(transactions, fundSources) {
 
   const csv = [headers.join(','), ...rows].join('\n');
   _downloadFile(csv, `vaultly-export-${_dateString()}.csv`, 'text/csv');
+  logSecurityEvent({ type: 'DATA_EXPORTED', details: { format: 'csv' } });
 }
 
 export function exportAccountCSV(fundSource, transactions) {
@@ -151,7 +150,14 @@ export function exportAccountCSV(fundSource, transactions) {
 }
 
 export function exportJSON(state) {
-  _downloadFile(JSON.stringify(state, null, 2), `vaultly-backup-${_dateString()}.json`, 'application/json');
+  const sanitized = {
+    ...state,
+    auth: undefined,
+    session: undefined,
+    token: undefined
+  };
+  _downloadFile(JSON.stringify(sanitized, null, 2), `vaultly-export-${_dateString()}.json`, 'application/json');
+  logSecurityEvent({ type: 'DATA_EXPORTED', details: { format: 'json' } });
 }
 
 export function importJSON(jsonString) {
