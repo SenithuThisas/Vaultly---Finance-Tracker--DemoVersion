@@ -10,6 +10,10 @@
  */
 export function showToast(message, type = 'info', duration = 3000) {
   const container = document.getElementById('toast-container');
+  if (!container) {
+    console.log(`[${type}] ${message}`);
+    return;
+  }
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
 

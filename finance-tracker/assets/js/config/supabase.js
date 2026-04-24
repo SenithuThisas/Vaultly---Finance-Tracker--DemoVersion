@@ -2,6 +2,8 @@
  * @fileoverview Supabase client configuration
  */
 
+import { createClient } from '@supabase/supabase-js';
+
 const env = import.meta.env;
 
 const SUPABASE_URL = env.VITE_SUPABASE_URL || '';
@@ -18,17 +20,39 @@ let authRejected = false;
 let healthCheckPromise = null;
 let cachedHealthResult = null;
 
+export const db = isConfigured()
+  ? createClient(SUPABASE_URL, SUPABASE_API_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
+
 function isJwtLikeKey(key) {
   return typeof key === 'string' && key.split('.').length === 3;
 }
 
-export function getSupabaseHeaders(withJsonContentType = false) {
+export async function getSupabaseHeaders(withJsonContentType = false) {
   const headers = {
     'apikey': SUPABASE_API_KEY
   };
 
-  // Publishable keys (sb_publishable_*) are not JWTs, so skip Bearer for those.
-  if (isJwtLikeKey(SUPABASE_API_KEY)) {
+  let accessToken = null;
+  if (db) {
+    try {
+      const { data } = await db.auth.getSession();
+      accessToken = data?.session?.access_token || null;
+    } catch {
+      accessToken = null;
+    }
+  }
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  } else if (isJwtLikeKey(SUPABASE_API_KEY)) {
+    // Publishable keys (sb_publishable_*) are not JWTs, so skip Bearer for those.
     headers.Authorization = `Bearer ${SUPABASE_API_KEY}`;
   }
 
@@ -65,7 +89,7 @@ export async function checkSupabaseHealth() {
       // Query an actual table with limit=0 — returns 200 even with RLS active.
       const response = await fetch(`${supabaseUrl}/rest/v1/fund_sources?select=id&limit=0`, {
         method: 'GET',
-        headers: getSupabaseHeaders()
+        headers: await getSupabaseHeaders()
       });
       if (response.status === 401 || response.status === 403) {
         authRejected = true;

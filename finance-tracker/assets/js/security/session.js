@@ -17,13 +17,13 @@ const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_TIMEOUT_KEY = 'vaultly.idle-timeout-ms';
 
 let currentUser = null;
-let sessionRefreshTimer = null;
 let idleTimer = null;
 let isLocked = false;
 let lockAttempts = 0;
 let lastViewBeforeLock = 'dashboard';
 let authSubscription = null;
 let idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
+let lastActivityTime = 0;
 
 function getSessionStorageKeys() {
   const projectRef = (db?.supabaseUrl || '').split('//')[1]?.split('.')[0];
@@ -89,27 +89,18 @@ export async function initSession({
     if (error) throw error;
 
     if (session) {
-      const expiresAt = (session.expires_at || 0) * 1000;
-      const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
-
-      if (expiresAt - now < fiveMinutes) {
-        await refreshSession({ handleSessionExpired, showSessionExpired, clearAppState, clearUserCache, showToast });
-      }
-
       currentUser = session.user;
-      scheduleSessionRefresh(session, { handleSessionExpired, showSessionExpired, clearAppState, clearUserCache, showToast });
       await loadUserData();
       hideAuthScreen();
       showApp();
-      resetIdleTimer();
+      resetIdleTimer(true);
     } else {
       showAuthScreen();
       hideApp();
     }
 
     setupStorageSync({ showAuthScreen, showApp, hideApp, clearAppState, showToast });
-    setupIdleTracking({ showApp, showAuthScreen, hideApp, showToast });
+    setupIdleTracking({ showApp, showAuthScreen, hideApp, showToast, showSessionExpired, clearAppState, clearUserCache });
     setupAuthListener({
       showAuthScreen,
       hideAuthScreen,
@@ -135,28 +126,7 @@ function handleSessionError(err, { showAuthScreen, hideApp, showToast }) {
   hideApp();
 }
 
-function scheduleSessionRefresh(session, context) {
-  if (sessionRefreshTimer) {
-    clearTimeout(sessionRefreshTimer);
-  }
-  const expiresAt = (session?.expires_at || 0) * 1000;
-  const now = Date.now();
-  const refreshAt = expiresAt - 10 * 60 * 1000;
-  const delay = Math.max(refreshAt - now, 0);
 
-  sessionRefreshTimer = setTimeout(async () => {
-    await refreshSession(context);
-  }, delay);
-}
-
-async function refreshSession(context) {
-  const { data, error } = await db.auth.refreshSession();
-  if (error || !data?.session) {
-    handleSessionExpired(context);
-    return;
-  }
-  scheduleSessionRefresh(data.session, context);
-}
 
 function handleSessionExpired({ showSessionExpired, clearAppState, clearUserCache, showToast }) {
   clearAppState();
@@ -176,16 +146,14 @@ function setupAuthListener({ showAuthScreen, hideAuthScreen, showApp, hideApp, l
     switch (event) {
       case 'SIGNED_IN':
         currentUser = session?.user || null;
-        scheduleSessionRefresh(session, { handleSessionExpired, showSessionExpired: () => showAuthScreen(), clearAppState, clearUserCache, showToast });
         await loadUserData();
         hideAuthScreen();
         showApp();
-        resetIdleTimer();
+        resetIdleTimer(true);
         resetAuthAttempts();
         logSecurityEvent({ type: 'LOGIN_SUCCESS', details: { email: currentUser?.email } });
         break;
       case 'SIGNED_OUT':
-        clearTimeout(sessionRefreshTimer);
         currentUser = null;
         clearAppState();
         clearUserCache();
@@ -195,7 +163,6 @@ function setupAuthListener({ showAuthScreen, hideAuthScreen, showApp, hideApp, l
         break;
       case 'TOKEN_REFRESHED':
         currentUser = session?.user || null;
-        scheduleSessionRefresh(session, { handleSessionExpired, showSessionExpired: () => showAuthScreen(), clearAppState, clearUserCache, showToast });
         break;
       case 'USER_UPDATED':
         currentUser = session?.user || null;
@@ -233,7 +200,18 @@ function setupStorageSync({ showAuthScreen, showApp, hideApp, clearAppState, sho
 function setupIdleTracking(context) {
   const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
   events.forEach(evt => {
-    document.addEventListener(evt, resetIdleTimer, { passive: true });
+    document.addEventListener(evt, () => resetIdleTimer(), { passive: true });
+  });
+
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && db && currentUser) {
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) {
+        handleSessionExpired(context);
+      } else {
+        resetIdleTimer(true);
+      }
+    }
   });
 
   const unlockBtn = document.getElementById('lock-unlock-btn');
@@ -259,8 +237,13 @@ function setupIdleTracking(context) {
   resetIdleTimer();
 }
 
-function resetIdleTimer() {
+function resetIdleTimer(force = false) {
   if (isLocked || idleTimeoutMs === Number.MAX_SAFE_INTEGER) return;
+  
+  const now = Date.now();
+  if (!force && now - lastActivityTime < 1000) return;
+  lastActivityTime = now;
+
   clearTimeout(idleTimer);
   idleTimer = setTimeout(lockApp, idleTimeoutMs);
 }
@@ -361,6 +344,25 @@ export async function signIn(email, password) {
   } else {
     resetAuthAttempts();
     logSecurityEvent({ type: 'LOGIN_SUCCESS', details: { email } });
+  }
+  return result;
+}
+
+export async function signUp(email, password) {
+  if (!db) {
+    return { error: new Error('Supabase is not configured.') };
+  }
+  if (!canAttemptAuth()) {
+    return { error: new Error('Authentication temporarily locked.') };
+  }
+
+  const result = await db.auth.signUp({ email, password });
+  if (result.error) {
+    logSecurityEvent({ type: 'SIGNUP_FAILED', details: { reason: result.error.message } });
+    recordFailedAuthAttempt();
+  } else {
+    resetAuthAttempts();
+    logSecurityEvent({ type: 'SIGNUP_SUCCESS', details: { email } });
   }
   return result;
 }
