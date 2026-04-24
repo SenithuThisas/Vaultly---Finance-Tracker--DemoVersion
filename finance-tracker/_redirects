@@ -1,0 +1,5 @@
+# Force HTTPS
+http://vaultly.netlify.app/* https://vaultly.netlify.app/:splat 301!
+
+# SPA fallback
+/* /index.html 200

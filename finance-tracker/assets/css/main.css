@@ -232,6 +232,30 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.3; }
   padding: 28px;
 }
 
+/* ── Custom Auth Screen Overrides for WebGL ── */
+.auth-screen {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+#auth-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none; /* Let clicks pass through if needed, though mousemove is on window */
+}
+
+.auth-card {
+  background: rgba(13, 13, 16, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+/* ──────────────────────────────────────────── */
+
 .loading-lock,
 .lock-icon,
 .session-lock {
