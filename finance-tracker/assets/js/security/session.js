@@ -12,6 +12,7 @@ import {
   setButtonLoading,
   setButtonReady
 } from './index.js';
+import { requireAuth, requireGuest } from './guards.js';
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_TIMEOUT_KEY = 'vaultly.idle-timeout-ms';
@@ -88,12 +89,31 @@ export async function initSession({
     const { data: { session }, error } = await db.auth.getSession();
     if (error) throw error;
 
+    // Detect Email Confirmation Token in URL
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    const isSignupConfirm = hash.includes('type=signup') || hash.includes('token_hash=') || search.includes('type=signup');
+
+    if (isSignupConfirm) {
+      currentUser = session?.user || null;
+      showAuthScreen(); // This will trigger the verification view in app.js
+      hideApp();
+      return;
+    }
+
     if (session) {
       currentUser = session.user;
-      await loadUserData();
-      hideAuthScreen();
-      showApp();
-      resetIdleTimer(true);
+      
+      const guard = requireAuth();
+      if (guard.shouldRedirect) {
+        showAuthScreen(); 
+        hideApp();
+      } else {
+        await loadUserData();
+        hideAuthScreen();
+        showApp();
+        resetIdleTimer(true);
+      }
     } else {
       showAuthScreen();
       hideApp();
@@ -329,7 +349,7 @@ function shakeLockInput() {
   input.classList.add('shake');
 }
 
-export async function signIn(email, password) {
+export async function signIn(email, password, options = {}) {
   if (!db) {
     return { error: new Error('Supabase is not configured.') };
   }
@@ -337,7 +357,14 @@ export async function signIn(email, password) {
     return { error: new Error('Authentication temporarily locked.') };
   }
 
-  const result = await db.auth.signInWithPassword({ email, password });
+  const result = await db.auth.signInWithPassword({ 
+    email, 
+    password,
+    options: {
+      persistSession: options.persistSession !== undefined ? options.persistSession : true
+    }
+  });
+
   if (result.error) {
     logSecurityEvent({ type: 'LOGIN_FAILED', details: { reason: result.error.message } });
     recordFailedAuthAttempt();
@@ -368,6 +395,25 @@ export async function signUp(email, password) {
 }
 
 export async function signOut(scope = 'local') {
-  if (!db) return;
-  await db.auth.signOut({ scope });
+  try {
+    if (db) {
+      await db.auth.signOut({ scope });
+    }
+  } catch (error) {
+    console.error('Sign out error:', error);
+  } finally {
+    currentUser = null;
+    if (idleTimer) clearTimeout(idleTimer);
+    
+    // Hard reset to clear all state and history
+    window.location.href = '/';
+  }
+}
+
+export async function resetPassword(email) {
+  if (!db) return { error: new Error('Supabase not configured') };
+  const { error } = await db.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/#type=recovery`
+  });
+  return { error };
 }

@@ -16,7 +16,9 @@
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/components.css">
   <link rel="stylesheet" href="assets/css/charts.css">
@@ -33,27 +35,164 @@
     </div>
   </div>
 
-  <div class="auth-screen" id="auth-screen">
+  <div class="auth-screen hidden" id="auth-screen">
     <canvas id="auth-canvas"></canvas>
-    <div class="auth-card">
-      <h2>Welcome to Vaultly</h2>
-      <p>Sign in to access your financial workspace.</p>
-      <form id="auth-form" class="auth-form">
-        <div class="form-group">
-          <label class="form-label">Email</label>
-          <input id="auth-email" type="email" class="form-input" autocomplete="username" required>
+    <div class="auth-card auth-fade-in">
+      <div class="auth-logo-container">
+        <div class="auth-logo-icon">🔐</div>
+        <div class="auth-wordmark">Vaultly</div>
+      </div>
+
+      <!-- Sign In View -->
+      <div id="auth-view-login" class="auth-view">
+        <div class="auth-header">
+          <h2>Welcome back</h2>
+          <p>Sign in to your financial workspace.</p>
         </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input id="auth-password" type="password" class="form-input" autocomplete="current-password" required>
+        <div id="login-error-banner" class="auth-error-banner hidden"></div>
+        <form id="login-form">
+          <div class="auth-form-group">
+            <label class="auth-label">Email Address</label>
+            <div class="auth-input-container">
+              <input id="login-email" type="email" class="auth-input" placeholder="name@example.com" required>
+              <span id="login-email-valid" class="auth-input-icon-right hidden">check_circle</span>
+            </div>
+          </div>
+          <div class="auth-form-group">
+            <label class="auth-label">Password</label>
+            <div class="auth-input-container">
+              <input id="login-password" type="password" class="auth-input" placeholder="••••••••" required>
+              <button type="button" class="auth-input-icon-right" id="login-password-toggle">visibility</button>
+            </div>
+            <div style="text-align: right; margin-top: 0.5rem;">
+              <button type="button" class="auth-link-btn" id="show-forgot-btn">Forgot password?</button>
+            </div>
+          </div>
+          <div class="auth-form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="login-remember" checked style="width: auto;">
+            <label for="login-remember" class="auth-muted">Remember me</label>
+          </div>
+          <button type="submit" class="auth-btn auth-btn-primary" id="login-submit-btn">
+            <span>Sign In</span>
+          </button>
+          <div style="text-align: center; margin-top: 1.5rem;">
+            <p class="auth-muted">Don't have an account? <button type="button" class="auth-link-btn" id="switch-to-signup">Sign Up</button></p>
+          </div>
+        </form>
+      </div>
+
+      <!-- Sign Up View -->
+      <div id="auth-view-signup" class="auth-view hidden">
+        <div class="auth-header">
+          <h2>Create Account</h2>
+          <p>Secure your financial future with Vaultly.</p>
         </div>
-        <div class="auth-error" id="auth-error"></div>
-        <button type="submit" class="btn btn-primary" id="auth-submit-btn">Sign In</button>
-        <div style="text-align: center; margin-top: 1rem;">
-          <button type="button" class="auth-muted-link" id="auth-toggle-mode-btn">Don't have an account? Sign Up</button>
+        <div id="signup-error-banner" class="auth-error-banner hidden"></div>
+        <form id="signup-form">
+          <div class="auth-form-group">
+            <label class="auth-label">Email Address</label>
+            <div class="auth-input-container">
+              <input id="signup-email" type="email" class="auth-input" placeholder="name@example.com" required>
+              <span id="signup-email-valid" class="auth-input-icon-right hidden">check_circle</span>
+            </div>
+          </div>
+          <div class="auth-form-group">
+            <label class="auth-label">Choose Password</label>
+            <div class="auth-input-container">
+              <input id="signup-password" type="password" class="auth-input" placeholder="••••••••" required>
+              <button type="button" class="auth-input-icon-right" id="signup-password-toggle">visibility</button>
+            </div>
+            <div class="strength-meter" id="password-strength-meter">
+              <div class="strength-bar"></div>
+              <div class="strength-bar"></div>
+              <div class="strength-bar"></div>
+              <div class="strength-bar"></div>
+            </div>
+            <div class="strength-label" id="password-strength-label">Strength: Weak</div>
+          </div>
+          <div class="auth-form-group">
+            <label class="auth-label">Confirm Password</label>
+            <div class="auth-input-container">
+              <input id="signup-password-confirm" type="password" class="auth-input" placeholder="••••••••" required>
+              <span id="signup-password-match" class="auth-input-icon-right hidden">check_circle</span>
+            </div>
+          </div>
+          <button type="submit" class="auth-btn auth-btn-primary" id="signup-submit-btn">
+            <span>Create My Vault</span>
+          </button>
+          <div style="text-align: center; margin-top: 1.5rem;">
+            <p class="auth-muted">Already have an account? <button type="button" class="auth-link-btn" id="switch-to-login">Sign In</button></p>
+          </div>
+        </form>
+      </div>
+
+      <!-- Forgot Password View -->
+      <div id="auth-view-forgot" class="auth-view hidden">
+        <div class="auth-header">
+          <h2>Reset Password</h2>
+          <p>We'll send you a link to get back into your vault.</p>
         </div>
-      </form>
-      <a href="#" id="auth-signout-link" class="auth-muted-link">Sign out all other sessions</a>
+        <div id="forgot-error-banner" class="auth-error-banner hidden"></div>
+        <form id="forgot-form">
+          <div class="auth-form-group">
+            <label class="auth-label">Email Address</label>
+            <div class="auth-input-container">
+              <input id="forgot-email" type="email" class="auth-input" placeholder="name@example.com" required>
+            </div>
+          </div>
+          <button type="submit" class="auth-btn auth-btn-primary" id="forgot-submit-btn">
+            <span>Send Reset Link</span>
+          </button>
+          <div style="text-align: center; margin-top: 1.5rem;">
+            <button type="button" class="auth-link-btn" id="forgot-back-btn">Back to Sign In</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Confirmation View -->
+      <div id="auth-view-confirm" class="auth-view hidden">
+        <div class="auth-status-view">
+          <div class="auth-status-icon">✉️</div>
+          <h2 class="auth-status-title">Check your inbox!</h2>
+          <p class="auth-status-text">
+            We've sent a confirmation link to <strong id="confirm-email-display" style="color:#fff"></strong>. 
+            Click the link in the email to activate your account.
+          </p>
+          <p class="auth-muted" style="margin-bottom: 2rem;">The link expires in 24 hours.</p>
+          <div class="auth-resend-container">
+            <button id="resend-confirm-btn" class="auth-btn auth-btn-primary">
+              <span>Resend Email</span>
+            </button>
+            <p id="resend-timer-text" class="auth-muted hidden" style="margin-top: 0.75rem;">Resend in 30s...</p>
+          </div>
+          <button type="button" class="auth-link-btn" id="confirm-back-btn">Wrong email? Go back</button>
+        </div>
+      </div>
+
+      <!-- Verification Success/Failure View -->
+      <div id="auth-view-verify" class="auth-view hidden">
+        <div class="auth-status-view">
+          <div id="verify-loading">
+            <div class="auth-status-icon" style="background: none; border: 2px solid var(--accent-amber); animation: spin 1s linear infinite;"></div>
+            <h2 class="auth-status-title">Verifying account...</h2>
+          </div>
+          <div id="verify-success" class="hidden">
+            <div class="auth-status-icon">🎉</div>
+            <h2 class="auth-status-title">Account confirmed!</h2>
+            <p class="auth-status-text">Welcome to Vaultly. Your financial workspace is ready.</p>
+          </div>
+          <div id="verify-error" class="hidden">
+            <div class="auth-status-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);">❌</div>
+            <h2 class="auth-status-title">Verification Failed</h2>
+            <p id="verify-error-text" class="auth-status-text">The link is invalid or has expired.</p>
+            <button class="auth-btn auth-btn-primary" id="verify-retry-btn">Request new link</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 2rem;">
+        <button id="auth-signout-all-btn" class="auth-link-btn" style="color: #6b7280; font-size: 0.75rem;">Sign out all other sessions</button>
+      </div>
     </div>
   </div>
 
