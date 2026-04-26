@@ -141,13 +141,15 @@ function showAddAccountModal() {
         ${FUND_SOURCE_TYPES.map(t => `<option value="${t.id}">${t.icon} ${t.label}</option>`).join('')}
       </select>
     </div>
-    <div class="form-group">
-      <label class="form-label">Bank Name</label>
-      <input type="text" class="form-input" id="modal-bank-name" placeholder="e.g. Commercial Bank">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Account Number (last 4 digits)</label>
-      <input type="text" class="form-input" id="modal-account-number" placeholder="1234" maxlength="4">
+    <div id="bank-specific-fields">
+      <div class="form-group">
+        <label class="form-label">Bank Name</label>
+        <input type="text" class="form-input" id="modal-bank-name" placeholder="e.g. Commercial Bank">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Account Number (last 4 digits)</label>
+        <input type="text" class="form-input" id="modal-account-number" placeholder="1234" maxlength="4">
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -175,8 +177,9 @@ function showAddAccountModal() {
 
     const name = document.getElementById('modal-account-name').value;
     const type = document.getElementById('modal-account-type').value;
-    const bankName = document.getElementById('modal-bank-name').value;
-    const accountNumber = document.getElementById('modal-account-number').value;
+    const isCash = type === 'cash';
+    const bankName = isCash ? null : document.getElementById('modal-bank-name').value;
+    const accountNumber = isCash ? null : document.getElementById('modal-account-number').value;
     const balance = document.getElementById('modal-balance').value;
     const currency = document.getElementById('modal-currency').value;
     const color = document.getElementById('modal-color').value;
@@ -196,6 +199,19 @@ function showAddAccountModal() {
       return false;
     }
   });
+
+  // Reactive field visibility
+  const typeSelect = document.getElementById('modal-account-type');
+  const bankFields = document.getElementById('bank-specific-fields');
+  const updateVisibility = () => {
+    if (typeSelect.value === 'cash') {
+      bankFields.classList.add('hidden');
+    } else {
+      bankFields.classList.remove('hidden');
+    }
+  };
+  typeSelect.addEventListener('change', updateVisibility);
+  updateVisibility();
 }
 
 function showEditAccountModal(id) {
@@ -216,13 +232,15 @@ function showEditAccountModal(id) {
         ${FUND_SOURCE_TYPES.map(t => `<option value="${t.id}" ${t.id === fs.type ? 'selected' : ''}>${t.icon} ${t.label}</option>`).join('')}
       </select>
     </div>
-    <div class="form-group">
-      <label class="form-label">Bank Name</label>
-      <input type="text" class="form-input" id="edit-bank-name" value="${fs.bankName || ''}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Account Number (last 4 digits)</label>
-      <input type="text" class="form-input" id="edit-account-number" value="${fs.accountNumber || ''}" maxlength="4">
+    <div id="edit-bank-specific-fields">
+      <div class="form-group">
+        <label class="form-label">Bank Name</label>
+        <input type="text" class="form-input" id="edit-bank-name" value="${fs.bankName || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Account Number (last 4 digits)</label>
+        <input type="text" class="form-input" id="edit-account-number" value="${fs.accountNumber || ''}" maxlength="4">
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -254,8 +272,9 @@ function showEditAccountModal(id) {
 
     const name = document.getElementById('edit-account-name').value;
     const type = document.getElementById('edit-account-type').value;
-    const bankName = document.getElementById('edit-bank-name').value;
-    const accountNumber = document.getElementById('edit-account-number').value;
+    const isCash = type === 'cash';
+    const bankName = isCash ? null : document.getElementById('edit-bank-name').value;
+    const accountNumber = isCash ? null : document.getElementById('edit-account-number').value;
     const balance = document.getElementById('edit-balance').value;
     const currency = document.getElementById('edit-currency').value;
     const color = document.getElementById('edit-color').value;
@@ -276,6 +295,19 @@ function showEditAccountModal(id) {
       return false;
     }
   }, 'Save');
+
+  // Reactive field visibility
+  const typeSelect = document.getElementById('edit-account-type');
+  const bankFields = document.getElementById('edit-bank-specific-fields');
+  const updateVisibility = () => {
+    if (typeSelect.value === 'cash') {
+      bankFields.classList.add('hidden');
+    } else {
+      bankFields.classList.remove('hidden');
+    }
+  };
+  typeSelect.addEventListener('change', updateVisibility);
+  updateVisibility();
 }
 
 function showDeleteConfirmation(id) {
