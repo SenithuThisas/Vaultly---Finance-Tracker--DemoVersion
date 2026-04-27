@@ -10,6 +10,7 @@ import { RecurringService } from '../services/recurring.service.js';
 import { BudgetService } from '../services/budget.service.js';
 import { CATEGORIES } from '../data/seed.js';
 import { drawLineChart, drawBarChart, drawHeatmap, formatCurrency, formatPct } from '../components/charts.js';
+import { sensitiveValueHtml } from '../security/privacy.js';
 
 /**
  * Render analytics view
@@ -49,17 +50,17 @@ export function renderAnalytics() {
     <div class="grid grid-3" style="margin-bottom: 32px;">
       <div class="stat-card">
         <div class="stat-label">Avg Daily Spend</div>
-        <div class="stat-value" style="font-size: 22px;">${formatCurrency(AnalyticsService.getAvgDailySpend(now.getFullYear(), now.getMonth()))}</div>
+        <div class="stat-value" style="font-size: 22px;">${sensitiveValueHtml(formatCurrency(AnalyticsService.getAvgDailySpend(now.getFullYear(), now.getMonth())), { width: '11ch', copyValue: String(AnalyticsService.getAvgDailySpend(now.getFullYear(), now.getMonth())), copyLabel: 'Average daily spend' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Highest Single DR</div>
         <div class="stat-value" style="font-size: 22px; color: var(--accent-red);">
-          ${Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount)).toLocaleString('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 })}
+          ${sensitiveValueHtml(Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount)).toLocaleString('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }), { width: '11ch', copyValue: String(Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount))), copyLabel: 'Highest debit' })}
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Recurring Total</div>
-        <div class="stat-value" style="font-size: 22px; color: var(--accent-blue);">${formatCurrency(AnalyticsService.getRecurringTotal())}</div>
+        <div class="stat-value" style="font-size: 22px; color: var(--accent-blue);">${sensitiveValueHtml(formatCurrency(AnalyticsService.getRecurringTotal()), { width: '11ch', copyValue: String(AnalyticsService.getRecurringTotal()), copyLabel: 'Recurring total' })}</div>
       </div>
     </div>
 
@@ -143,7 +144,7 @@ export function renderAnalytics() {
                 return `
                   <tr style="${isDueSoon ? 'background: rgba(244, 185, 66, 0.1);' : ''}">
                     <td>${r.title}</td>
-                    <td class="mono" style="color: ${r.type === 'CR' ? 'var(--accent-green)' : 'var(--accent-red)'};">${r.type === 'CR' ? '+' : '-'}${formatCurrency(r.amount)}</td>
+                    <td class="mono" style="color: ${r.type === 'CR' ? 'var(--accent-green)' : 'var(--accent-red)'};">${sensitiveValueHtml(`${r.type === 'CR' ? '+' : '-'}${formatCurrency(r.amount)}`, { width: '10ch', copyValue: String(r.amount), copyLabel: 'Recurring amount' })}</td>
                     <td>${r.period}</td>
                     <td class="mono" style="color: ${isDueSoon ? 'var(--accent-gold)' : 'var(--text-muted)'};">${new Date(r.nextDueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
                   </tr>
@@ -211,7 +212,7 @@ function drawAllocationChart() {
             <div class="progress-fill green" style="width: 60%; background: ${d.color};"></div>
           </div>
         </div>
-        <div style="font-family: var(--font-mono); font-size: 13px;">${formatCurrency(d.amount)}</div>
+        <div style="font-family: var(--font-mono); font-size: 13px;">${sensitiveValueHtml(formatCurrency(d.amount), { width: '10ch', copyValue: String(d.amount), copyLabel: 'Allocation amount' })}</div>
       </div>
     `).join('') || '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">No data</div></div>';
   }
