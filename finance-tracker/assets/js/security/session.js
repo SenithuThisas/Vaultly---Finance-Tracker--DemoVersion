@@ -14,10 +14,13 @@ import {
 } from './index.js';
 import { showToast } from '../components/toast.js';
 import { requireAuth } from './guards.js';
+import { setForcedPrivacyBlur } from './privacy.js';
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_TIMEOUT_KEY = 'vaultly.idle-timeout-ms';
 const SESSION_CHECK_INTERVAL_MS = 240000;
+const IDLE_WARNING_GRACE_MS = 60 * 1000;
+const IDLE_LOGOUT_AFTER_LOCK_MS = 5 * 60 * 1000;
 
 let currentUser = null;
 let idleTimer = null;
@@ -28,6 +31,10 @@ let authSubscription = null;
 let idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
 let lastActivityTime = 0;
 let sessionCheckInterval = null;
+let warningTimer = null;
+let lockTimer = null;
+let logoutTimer = null;
+let activityDebounceTimer = null;
 
 function getSessionStorageKeys() {
   const projectRef = (db?.supabaseUrl || '').split('//')[1]?.split('.')[0];
@@ -257,9 +264,16 @@ function setupStorageSync({ showAuthScreen, showApp, hideApp, clearAppState, sho
 }
 
 function setupIdleTracking(context) {
-  const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
+  const debouncedActivityHandler = () => {
+    clearTimeout(activityDebounceTimer);
+    activityDebounceTimer = setTimeout(() => {
+      handleUserActivity();
+    }, 180);
+  };
+
+  const events = ['mousemove', 'mousedown', 'click', 'keypress', 'touchstart'];
   events.forEach(evt => {
-    document.addEventListener(evt, () => resetIdleTimer(), { passive: true });
+    document.addEventListener(evt, debouncedActivityHandler, { passive: true });
   });
 
   document.addEventListener('visibilitychange', async () => {
@@ -268,6 +282,7 @@ function setupIdleTracking(context) {
       if (!session) {
         handleSessionExpired(context);
       } else {
+        setForcedPrivacyBlur(false);
         resetIdleTimer(true);
       }
     }
@@ -300,11 +315,52 @@ function resetIdleTimer(force = false) {
   if (isLocked || idleTimeoutMs === Number.MAX_SAFE_INTEGER) return;
   
   const now = Date.now();
-  if (!force && now - lastActivityTime < 1000) return;
+  if (!force && now - lastActivityTime < 700) return;
   lastActivityTime = now;
 
+  clearInactivityStageTimers();
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(lockApp, idleTimeoutMs);
+  idleTimer = setTimeout(() => onInactivityWarning(), idleTimeoutMs);
+}
+
+function clearInactivityStageTimers() {
+  clearTimeout(warningTimer);
+  clearTimeout(lockTimer);
+  clearTimeout(logoutTimer);
+  warningTimer = null;
+  lockTimer = null;
+  logoutTimer = null;
+}
+
+function handleUserActivity() {
+  if (!currentUser || isLocked) return;
+
+  setForcedPrivacyBlur(false);
+  resetIdleTimer();
+}
+
+function onInactivityWarning() {
+  if (!currentUser || isLocked) return;
+
+  setForcedPrivacyBlur(true);
+  warningTimer = null;
+  showToast('Session idle: sensitive values are blurred. Activity will keep you signed in.', 'warning', 3200);
+
+  clearTimeout(lockTimer);
+  lockTimer = setTimeout(() => {
+    lockApp();
+  }, IDLE_WARNING_GRACE_MS);
+
+  clearTimeout(logoutTimer);
+  logoutTimer = setTimeout(() => {
+    onInactivityLogout();
+  }, IDLE_WARNING_GRACE_MS + IDLE_LOGOUT_AFTER_LOCK_MS);
+}
+
+async function onInactivityLogout() {
+  if (!currentUser) return;
+  showToast('Signed out after extended inactivity.', 'warning', 3000);
+  await signOut('local');
 }
 
 function lockApp() {
@@ -314,6 +370,7 @@ function lockApp() {
   lastViewBeforeLock = activeView?.id?.replace('view-', '') || 'dashboard';
   isLocked = true;
   lockAttempts = 0;
+  setForcedPrivacyBlur(true);
 
   const lock = document.getElementById('lock-screen');
   if (lock) {
@@ -356,6 +413,7 @@ async function unlockApp(passwordOrPin, { showToast }) {
     lockAttempts = 0;
     resetAuthAttempts();
     hideLockScreen();
+    setForcedPrivacyBlur(false);
     resetIdleTimer();
     showToast('Welcome back!', 'success');
     logSecurityEvent({ type: 'APP_UNLOCKED', details: {} });
@@ -368,6 +426,11 @@ function hideLockScreen() {
   const lock = document.getElementById('lock-screen');
   if (lock) {
     lock.classList.remove('open');
+  }
+  const errorEl = document.getElementById('lock-error');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
   }
 }
 
@@ -492,6 +555,14 @@ export function clearLocalSession() {
     clearTimeout(idleTimer);
     idleTimer = null;
   }
+
+  clearInactivityStageTimers();
+  if (activityDebounceTimer) {
+    clearTimeout(activityDebounceTimer);
+    activityDebounceTimer = null;
+  }
+
+  setForcedPrivacyBlur(false);
 
   clearSessionCheckInterval();
 }
