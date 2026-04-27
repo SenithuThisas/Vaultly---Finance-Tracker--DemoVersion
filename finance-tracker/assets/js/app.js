@@ -107,7 +107,10 @@ function switchAuthView(viewName) {
 }
 
 function hideAuthScreen() {
-  document.getElementById('auth-screen')?.classList.remove('open');
+  const auth = document.getElementById('auth-screen');
+  if (!auth) return;
+  auth.classList.remove('open');
+  auth.classList.add('hidden');
 }
 
 function showPasswordResetScreen() {
@@ -255,26 +258,31 @@ function setupAuthHandlers() {
     e.preventDefault();
     const email = loginEmail.value.trim();
     const password = document.getElementById('login-password').value;
-    const remember = document.getElementById('login-remember').checked;
     const btn = document.getElementById('login-submit-btn');
 
     setButtonLoading(btn, 'Signing in...');
     hideErrorBanner('login-error-banner');
 
-    const { error } = await signIn(email, password, { persistSession: remember });
-    setButtonReady(btn);
+    try {
+      const { error } = await signIn(email, password);
 
-    if (error) {
+      if (error) {
+        showErrorBanner('login-error-banner', translateError(error));
+        shakeInput(loginForm);
+      } else {
+        hideAuthScreen();
+        // Redirect to intended route if exists
+        const intended = sessionStorage.getItem('intendedRoute');
+        if (intended) {
+          sessionStorage.removeItem('intendedRoute');
+          window.location.href = intended;
+        }
+      }
+    } catch (error) {
       showErrorBanner('login-error-banner', translateError(error));
       shakeInput(loginForm);
-    } else {
-      hideAuthScreen();
-      // Redirect to intended route if exists
-      const intended = sessionStorage.getItem('intendedRoute');
-      if (intended) {
-        sessionStorage.removeItem('intendedRoute');
-        window.location.href = intended;
-      }
+    } finally {
+      setButtonReady(btn);
     }
   });
 
