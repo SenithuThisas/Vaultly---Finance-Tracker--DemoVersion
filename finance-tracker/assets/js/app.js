@@ -23,6 +23,7 @@ import {
   logSecurityEvent,
   showErrorModal
 } from './security/index.js';
+import { initPrivacyControls, sensitiveValueHtml } from './security/privacy.js';
 import {
   initSession,
   signIn,
@@ -107,7 +108,10 @@ function switchAuthView(viewName) {
 }
 
 function hideAuthScreen() {
-  document.getElementById('auth-screen')?.classList.remove('open');
+  const auth = document.getElementById('auth-screen');
+  if (!auth) return;
+  auth.classList.remove('open');
+  auth.classList.add('hidden');
 }
 
 function showPasswordResetScreen() {
@@ -172,6 +176,7 @@ function initCoreUI() {
   initModal();
   initDrawer();
   initNav();
+  initPrivacyControls();
   setupMobileViewport();
   registerKeyboardShortcuts();
   registerGlobalSearch();
@@ -255,26 +260,31 @@ function setupAuthHandlers() {
     e.preventDefault();
     const email = loginEmail.value.trim();
     const password = document.getElementById('login-password').value;
-    const remember = document.getElementById('login-remember').checked;
     const btn = document.getElementById('login-submit-btn');
 
     setButtonLoading(btn, 'Signing in...');
     hideErrorBanner('login-error-banner');
 
-    const { error } = await signIn(email, password, { persistSession: remember });
-    setButtonReady(btn);
+    try {
+      const { error } = await signIn(email, password);
 
-    if (error) {
+      if (error) {
+        showErrorBanner('login-error-banner', translateError(error));
+        shakeInput(loginForm);
+      } else {
+        hideAuthScreen();
+        // Redirect to intended route if exists
+        const intended = sessionStorage.getItem('intendedRoute');
+        if (intended) {
+          sessionStorage.removeItem('intendedRoute');
+          window.location.href = intended;
+        }
+      }
+    } catch (error) {
       showErrorBanner('login-error-banner', translateError(error));
       shakeInput(loginForm);
-    } else {
-      hideAuthScreen();
-      // Redirect to intended route if exists
-      const intended = sessionStorage.getItem('intendedRoute');
-      if (intended) {
-        sessionStorage.removeItem('intendedRoute');
-        window.location.href = intended;
-      }
+    } finally {
+      setButtonReady(btn);
     }
   });
 
@@ -625,7 +635,7 @@ function performSearch(query) {
         <div class="search-result-item" onclick="window.searchResultClick('tx', '${tx.id}')">
           <div style="font-weight:500;">${tx.title}</div>
           <div style="font-size:12px;color:var(--text-muted);">
-            ${new Date(tx.date).toLocaleDateString()} - ${fs?.name || '[Deleted]'} - ${tx.type === 'CR' ? '+' : '-'}${tx.amount.toLocaleString()}
+            ${new Date(tx.date).toLocaleDateString()} - ${fs?.name || '[Deleted]'} - ${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${tx.amount.toLocaleString()}`, { width: '8ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}
           </div>
         </div>
       `;
@@ -638,7 +648,7 @@ function performSearch(query) {
       html += `
         <div class="search-result-item" onclick="window.searchResultClick('fs', '${fs.id}')">
           <div style="font-weight:500;">${fs.name}</div>
-          <div style="font-size:12px;color:var(--text-muted);">${fs.type} - ${fs.balance?.toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--text-muted);">${fs.type} - ${sensitiveValueHtml(String(fs.balance?.toLocaleString() || '-'), { width: '8ch', copyValue: String(fs.balance || ''), copyLabel: 'Balance' })}</div>
         </div>
       `;
     });

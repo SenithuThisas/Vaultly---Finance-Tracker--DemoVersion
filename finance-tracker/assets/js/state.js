@@ -13,6 +13,10 @@ let AppState = {
   recurringRules: [],
   currentView: 'dashboard',
   filters: {},
+  ui: {
+    privacyModeEnabled: true,
+    forcedPrivacyBlur: false
+  },
   settings: {
     currency: 'LKR',
     dateFormat: 'DD/MM/YYYY',
@@ -21,6 +25,42 @@ let AppState = {
 };
 
 let viewRenderers = {};
+const uiSubscribers = new Set();
+
+const LOCAL_ONLY_ACTIONS = new Set([
+  'SET_VIEW',
+  'SET_PRIVACY_MODE',
+  'SET_FORCED_PRIVACY_BLUR'
+]);
+
+function ensureUiDefaults() {
+  if (!AppState.ui) {
+    AppState.ui = {
+      privacyModeEnabled: true,
+      forcedPrivacyBlur: false
+    };
+  }
+  if (typeof AppState.ui.privacyModeEnabled !== 'boolean') {
+    AppState.ui.privacyModeEnabled = true;
+  }
+  if (typeof AppState.ui.forcedPrivacyBlur !== 'boolean') {
+    AppState.ui.forcedPrivacyBlur = false;
+  }
+}
+
+function notifyUiSubscribers() {
+  const uiSnapshot = {
+    ...AppState.ui,
+    isPrivacyBlurActive: AppState.ui.privacyModeEnabled || AppState.ui.forcedPrivacyBlur
+  };
+  uiSubscribers.forEach(listener => {
+    try {
+      listener(uiSnapshot);
+    } catch (error) {
+      console.error('UI subscriber failed:', error);
+    }
+  });
+}
 
 /**
  * Register view renderers for re-rendering after state changes
@@ -36,7 +76,24 @@ export function registerViewRenderer(viewName, renderer) {
  * @returns {import('./types').AppState}
  */
 export function getState() {
+  ensureUiDefaults();
   return AppState;
+}
+
+/**
+ * Subscribe to UI-only global state (privacy, overlays, etc.)
+ * @param {(uiState: {privacyModeEnabled: boolean, forcedPrivacyBlur: boolean, isPrivacyBlurActive: boolean}) => void} listener
+ * @returns {() => void}
+ */
+export function subscribeUiState(listener) {
+  uiSubscribers.add(listener);
+  listener({
+    ...AppState.ui,
+    isPrivacyBlurActive: AppState.ui.privacyModeEnabled || AppState.ui.forcedPrivacyBlur
+  });
+  return () => {
+    uiSubscribers.delete(listener);
+  };
 }
 
 /**
@@ -44,7 +101,15 @@ export function getState() {
  * @param {import('./types').AppState} newState
  */
 export function setState(newState) {
-  AppState = newState;
+  AppState = {
+    ...newState,
+    ui: {
+      privacyModeEnabled: true,
+      forcedPrivacyBlur: false,
+      ...(newState?.ui || {})
+    }
+  };
+  ensureUiDefaults();
 }
 
 export function clearAppState() {
@@ -55,6 +120,10 @@ export function clearAppState() {
   AppState.recurringRules = [];
   AppState.filters = {};
   AppState.currentView = 'dashboard';
+  AppState.ui = {
+    privacyModeEnabled: true,
+    forcedPrivacyBlur: false
+  };
   AppState.settings = {
     currency: 'LKR',
     dateFormat: 'DD/MM/YYYY',
@@ -68,6 +137,8 @@ export function clearAppState() {
  * @param {*} payload - Action payload
  */
 export function dispatch(action, payload) {
+  ensureUiDefaults();
+
   switch (action) {
     case 'ADD_FUND_SOURCE':
       AppState.fundSources.push(payload);
@@ -118,13 +189,23 @@ export function dispatch(action, payload) {
     case 'SET_VIEW':
       AppState.currentView = payload;
       break;
+    case 'SET_PRIVACY_MODE':
+      AppState.ui.privacyModeEnabled = Boolean(payload);
+      notifyUiSubscribers();
+      return AppState;
+    case 'SET_FORCED_PRIVACY_BLUR':
+      AppState.ui.forcedPrivacyBlur = Boolean(payload);
+      notifyUiSubscribers();
+      return AppState;
     case 'UPDATE_SETTINGS':
       AppState.settings = { ...AppState.settings, ...payload };
       break;
   }
 
   // Write the specific record to Supabase immediately
-  saveRecord(action, payload).catch(err => console.error('saveRecord error:', err));
+  if (!LOCAL_ONLY_ACTIONS.has(action)) {
+    saveRecord(action, payload).catch(err => console.error('saveRecord error:', err));
+  }
 
   // Re-render current view
   const currentView = AppState.currentView;

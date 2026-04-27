@@ -5,17 +5,18 @@
 import { db } from '../config/supabase.js';
 
 /**
- * Checks if a session exists in localStorage for Supabase
+ * Checks if a session exists in sessionStorage for Supabase
  * Synchronous helper for guards
  */
 function getAuthUser() {
   try {
     const projectRef = (db?.supabaseUrl || '').split('//')[1]?.split('.')[0];
     const storageKey = projectRef ? `sb-${projectRef}-auth-token` : 'supabase.auth.token';
-    const sessionStr = localStorage.getItem(storageKey);
+    const sessionStr = sessionStorage.getItem(storageKey);
     
     if (sessionStr) {
       const session = JSON.parse(sessionStr);
+      if (!session?.expires_at || session.expires_at < Math.floor(Date.now() / 1000)) return null;
       return session?.user || null;
     }
   } catch (e) {

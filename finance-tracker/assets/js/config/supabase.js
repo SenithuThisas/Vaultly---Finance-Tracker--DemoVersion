@@ -25,7 +25,8 @@ export const db = isConfigured()
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        storage: window.sessionStorage
       }
     })
   : null;

@@ -10,6 +10,7 @@ import { openModal } from '../components/modal.js';
 import { openDrawer, closeDrawer } from '../components/drawer.js';
 import { formatCurrency } from '../components/charts.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
+import { sensitiveValueHtml } from '../security/privacy.js';
 
 /**
  * Render transfers view
@@ -75,8 +76,8 @@ export function renderTransfers() {
                     <td><span class="badge badge-trf">${fromFs?.name || '[Deleted]'}</span></td>
                     <td>→</td>
                     <td><span class="badge badge-trf">${toFs?.name || '[Deleted]'}</span></td>
-                    <td class="mono" style="color: var(--accent-blue);">${formatCurrency(t.amount)}</td>
-                    <td class="mono">${t.fee > 0 ? formatCurrency(t.fee) : '-'}</td>
+                    <td class="mono" style="color: var(--accent-blue);">${sensitiveValueHtml(formatCurrency(t.amount), { width: '10ch', copyValue: String(t.amount), copyLabel: 'Transfer amount' })}</td>
+                    <td class="mono">${t.fee > 0 ? sensitiveValueHtml(formatCurrency(t.fee), { width: '8ch', copyValue: String(t.fee), copyLabel: 'Transfer fee' }) : '-'}</td>
                     <td>${t.note || '-'}</td>
                     <td><span class="tx-delete" onclick="window.deleteTransfer('${t.id}')">🗑️</span></td>
                   </tr>
@@ -184,7 +185,7 @@ export function showAddTransferForm() {
         preview.innerHTML = `
           <div style="margin-bottom: 4px;">After transfer:</div>
           <div style="color: ${remaining >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
-            ${formatCurrency(remaining)}
+            ${sensitiveValueHtml(formatCurrency(remaining), { width: '10ch', copyValue: String(remaining), copyLabel: 'Remaining balance' })}
           </div>
         `;
       }

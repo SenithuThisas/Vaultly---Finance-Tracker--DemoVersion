@@ -11,6 +11,10 @@ import { openDrawer, closeDrawer } from '../components/drawer.js';
 import { CATEGORIES, CR_CATEGORIES, DR_CATEGORIES, CURRENCIES } from '../data/seed.js';
 import { formatCurrency } from '../components/charts.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
+import { sensitiveValueHtml } from '../security/privacy.js';
+
+const TRANSACTIONS_PAGE_SIZE = 50;
+let currentPage = 1;
 
 /**
  * Render transactions view
@@ -73,6 +77,7 @@ export function renderTransactions() {
         <div class="empty-icon">🔍</div>
         <div class="empty-text">No transactions found</div>
       </div>
+      <div id="tx-pagination" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 4px 0;"></div>
     </div>
   `;
 
@@ -101,21 +106,30 @@ function setupEventListeners() {
     let timeout;
     searchInput.addEventListener('input', () => {
       clearTimeout(timeout);
-      timeout = setTimeout(renderTransactionTable, 300);
+      timeout = setTimeout(() => {
+        currentPage = 1;
+        renderTransactionTable();
+      }, 300);
     });
   }
 
   // Filters
   ['tx-type-filter', 'tx-category-filter', 'tx-month-filter'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('change', renderTransactionTable);
+    if (el) {
+      el.addEventListener('change', () => {
+        currentPage = 1;
+        renderTransactionTable();
+      });
+    }
   });
 }
 
 function renderTransactionTable() {
   const tbody = document.getElementById('tx-table-body');
   const emptyEl = document.getElementById('tx-empty');
-  if (!tbody || !emptyEl) return;
+  const paginationEl = document.getElementById('tx-pagination');
+  if (!tbody || !emptyEl || !paginationEl) return;
 
   const search = document.getElementById('tx-search')?.value?.toLowerCase() || '';
   const typeFilter = document.getElementById('tx-type-filter')?.value || '';
@@ -150,15 +164,21 @@ function renderTransactionTable() {
   // Sort by date descending
   filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / TRANSACTIONS_PAGE_SIZE));
+  currentPage = Math.min(currentPage, pageCount);
+  const startIdx = (currentPage - 1) * TRANSACTIONS_PAGE_SIZE;
+  const pagedRows = filtered.slice(startIdx, startIdx + TRANSACTIONS_PAGE_SIZE);
+
   if (filtered.length === 0) {
     tbody.innerHTML = '';
     emptyEl.style.display = 'block';
+    paginationEl.innerHTML = '';
     return;
   }
 
   emptyEl.style.display = 'none';
 
-  tbody.innerHTML = filtered.map(tx => {
+  tbody.innerHTML = pagedRows.map(tx => {
     const cat = CATEGORIES.find(c => c.id === tx.category) || { emoji: '📦', label: tx.category };
     const fs = getState().fundSources.find(f => f.id === tx.fundSourceId);
     const date = new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
@@ -170,11 +190,19 @@ function renderTransactionTable() {
         <td><span class="badge badge-${typeClass}">${cat.emoji} ${cat.label}</span></td>
         <td>${tx.title}</td>
         <td>${fs?.name || '[Deleted]'}</td>
-        <td class="mono tx-amount ${typeClass}">${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}</td>
+        <td class="mono tx-amount ${typeClass}">${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}`, { width: '10ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}</td>
         <td><span class="tx-delete" onclick="window.deleteTransaction('${tx.id}')">🗑️</span></td>
       </tr>
     `;
   }).join('');
+
+  const prevDisabled = currentPage === 1 ? 'disabled' : '';
+  const nextDisabled = currentPage === pageCount ? 'disabled' : '';
+  paginationEl.innerHTML = `
+    <button class="btn btn-sm btn-secondary" ${prevDisabled} onclick="window.changeTxPage(${currentPage - 1})">Prev</button>
+    <span style="align-self:center;color:var(--text-muted);font-size:12px;">Page ${currentPage} / ${pageCount}</span>
+    <button class="btn btn-sm btn-secondary" ${nextDisabled} onclick="window.changeTxPage(${currentPage + 1})">Next</button>
+  `;
 }
 
 /**
@@ -370,6 +398,12 @@ window.deleteTransaction = function(id) {
     renderTransactions();
     return true;
   });
+};
+
+window.changeTxPage = function(page) {
+  if (page < 1) return;
+  currentPage = page;
+  renderTransactionTable();
 };
 
 // Register view for automatic re-rendering
