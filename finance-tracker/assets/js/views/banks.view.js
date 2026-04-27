@@ -11,6 +11,9 @@ import { openModal } from '../components/modal.js';
 import { CATEGORIES, FUND_SOURCE_TYPES, CURRENCIES } from '../data/seed.js';
 import { canSubmit, translateError } from '../security/index.js';
 import { AnalyticsService } from '../services/analytics.service.js';
+import { sensitiveValueHtml, getPrivacyLabel, isPrivacyModeEnabled } from '../security/privacy.js';
+
+const accountPrivacyOverrides = new Map();
 
 /**
  * Render banks/fund sources view
@@ -31,7 +34,7 @@ export function renderBanks() {
 
     <div class="net-worth-hero">
       <div class="net-worth-label">Total Net Worth</div>
-      <div class="net-worth-value">${formatCurrency(netWorth)}</div>
+      <div class="net-worth-value">${sensitiveValueHtml(formatCurrency(netWorth), { width: '13ch', copyValue: String(netWorth), copyLabel: 'Net worth' })}</div>
     </div>
 
     <div class="grid grid-3" id="accounts-grid">
@@ -66,21 +69,28 @@ function renderAccountCards() {
     const sparklineData = FundSourceService.getSparklineData(fs.id, 14);
     const balanceClass = balance >= 0 ? 'positive' : 'negative';
     const sparklineColor = balance >= 0 ? '#10B981' : '#FF6B6B';
+    const localReveal = Boolean(accountPrivacyOverrides.get(fs.id));
+    const showFullAccount = !isPrivacyModeEnabled() || localReveal;
+    const accountLabel = getPrivacyLabel(fs.accountNumber, showFullAccount);
+    const eyeIcon = localReveal ? '🙈' : '👁️';
+    const eyeLabel = localReveal ? 'Hide this card' : 'Reveal this card';
 
     return `
-      <div class="account-card" data-id="${fs.id}">
+      <div class="account-card" data-id="${fs.id}" data-sensitive-scope="account" data-revealed="${localReveal ? 'true' : 'false'}">
         <div class="account-header">
           <span class="account-name">${fs.name}</span>
           <span class="account-type">${fs.type.replace('_', ' ')}</span>
+          <button class="btn btn-sm btn-ghost" data-action="privacy" data-id="${fs.id}" aria-label="${eyeLabel}" title="${eyeLabel}" style="margin-left: auto; padding: 2px 8px;">${eyeIcon}</button>
         </div>
-        <div class="account-balance ${balanceClass}">${formatCurrency(balance)}</div>
+        <div class="account-balance ${balanceClass}">${sensitiveValueHtml(formatCurrency(balance), { width: '12ch', copyValue: String(balance), copyLabel: 'Balance' })}</div>
         <div class="account-meta">
-          ${fs.bankName ? fs.bankName + ' · ' : ''} ${fs.accountNumber ? '••••' + fs.accountNumber : ''}
+          ${fs.bankName ? fs.bankName + ' · ' : ''}
+          ${fs.accountNumber ? sensitiveValueHtml(accountLabel, { width: '10ch', copyValue: fs.accountNumber, copyLabel: 'Account number' }) : '-'}
         </div>
         <div class="sparkline-chart" id="sparkline-${fs.id}"></div>
         <div style="margin-top: 12px; display: flex; gap: 12px; font-size: 13px;">
-          <span style="color: var(--accent-green);">CR: ${formatCurrency(monthlyFlow.cr)}</span>
-          <span style="color: var(--accent-red);">DR: ${formatCurrency(monthlyFlow.dr)}</span>
+          <span style="color: var(--accent-green);">CR: ${sensitiveValueHtml(formatCurrency(monthlyFlow.cr), { width: '10ch', copyValue: String(monthlyFlow.cr), copyLabel: 'Credit total' })}</span>
+          <span style="color: var(--accent-red);">DR: ${sensitiveValueHtml(formatCurrency(monthlyFlow.dr), { width: '10ch', copyValue: String(monthlyFlow.dr), copyLabel: 'Debit total' })}</span>
         </div>
         <div class="account-actions">
           <button class="btn btn-edit" data-action="edit" data-id="${fs.id}">✏️ Edit</button>
@@ -115,13 +125,18 @@ function setupEventListeners() {
   const grid = document.getElementById('accounts-grid');
   if (grid) {
     grid.addEventListener('click', (e) => {
-      const action = e.target.dataset.action;
-      const id = e.target.dataset.id;
+      const actionEl = e.target.closest('[data-action]');
+      const action = actionEl?.dataset.action;
+      const id = actionEl?.dataset.id;
 
       if (action === 'edit' && id) {
         showEditAccountModal(id);
       } else if (action === 'delete' && id) {
         showDeleteConfirmation(id);
+      } else if (action === 'privacy' && id) {
+        const current = Boolean(accountPrivacyOverrides.get(id));
+        accountPrivacyOverrides.set(id, !current);
+        renderAccountCards();
       }
     });
   }
@@ -147,8 +162,8 @@ function showAddAccountModal() {
         <input type="text" class="form-input" id="modal-bank-name" placeholder="e.g. Commercial Bank">
       </div>
       <div class="form-group">
-        <label class="form-label">Account Number (last 4 digits)</label>
-        <input type="text" class="form-input" id="modal-account-number" placeholder="1234" maxlength="4">
+        <label class="form-label">Account Number</label>
+        <input type="text" class="form-input" id="modal-account-number" placeholder="1234567890" inputmode="numeric">
       </div>
     </div>
     <div class="form-row">
@@ -240,8 +255,8 @@ function showEditAccountModal(id) {
         <input type="text" class="form-input" id="edit-bank-name" value="${fs.bankName || ''}">
       </div>
       <div class="form-group">
-        <label class="form-label">Account Number (last 4 digits)</label>
-        <input type="text" class="form-input" id="edit-account-number" value="${fs.accountNumber || ''}" maxlength="4">
+        <label class="form-label">Account Number</label>
+        <input type="text" class="form-input" id="edit-account-number" value="${fs.accountNumber || ''}" inputmode="numeric">
       </div>
     </div>
     <div class="form-row">
