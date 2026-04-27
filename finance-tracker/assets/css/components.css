@@ -47,6 +47,74 @@
 .btn-sm { padding: 8px 14px; font-size: 12px; min-height: 36px; }
 .btn-lg { padding: 14px 28px; font-size: 16px; }
 
+.privacy-toggle-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.privacy-toggle-btn .material-icons {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  opacity: 0;
+  filter: blur(4px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal), filter var(--transition-normal), color var(--transition-normal);
+}
+
+.privacy-toggle-btn .material-icons.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  filter: blur(0);
+}
+
+.privacy-toggle-btn.active {
+  background: rgba(244, 185, 66, 0.18);
+  border: 1px solid rgba(244, 185, 66, 0.35);
+}
+
+.privacy-toggle-btn.active .material-icons {
+  color: var(--accent-gold);
+}
+
+.sensitive-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sensitive-value {
+  display: inline-block;
+  min-width: var(--sensitive-min-width, 10ch);
+  white-space: nowrap;
+  transition: filter var(--transition-normal), opacity var(--transition-normal);
+}
+
+.privacy-blur .sensitive-value {
+  filter: blur(7px);
+  opacity: 0.9;
+}
+
+.privacy-blur [data-sensitive-scope="account"][data-revealed="true"] .sensitive-value {
+  filter: blur(0);
+  opacity: 1;
+}
+
+.sensitive-copy-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+}
+
+.sensitive-copy-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-gold);
+}
+
 /* ── Forms ─────────────────────────────────── */
 .form-group { margin-bottom: 20px; }
 
