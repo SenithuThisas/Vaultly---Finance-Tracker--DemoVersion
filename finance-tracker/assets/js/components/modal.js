@@ -54,6 +54,7 @@ export function closeModal() {
  */
 export function initModal() {
   const overlay = document.getElementById('modal-overlay');
+  const modal = document.querySelector('.modal');
   const closeBtn = document.getElementById('modal-close');
   const cancelBtn = document.getElementById('modal-cancel');
   const confirmBtn = document.getElementById('modal-confirm');
@@ -76,4 +77,31 @@ export function initModal() {
       closeModal();
     }
   });
+
+  if (modal) {
+    let startY = 0;
+    let tracking = false;
+
+    modal.addEventListener('touchstart', event => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      startY = touch.clientY;
+      tracking = true;
+    }, { passive: true });
+
+    modal.addEventListener('touchmove', event => {
+      if (!tracking) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      const deltaY = touch.clientY - startY;
+      if (deltaY > 90) {
+        closeModal();
+        tracking = false;
+      }
+    }, { passive: true });
+
+    modal.addEventListener('touchend', () => {
+      tracking = false;
+    });
+  }
 }

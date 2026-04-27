@@ -24,6 +24,7 @@ import {
   showErrorModal
 } from './security/index.js';
 import { initPrivacyControls, sensitiveValueHtml } from './security/privacy.js';
+import { formatCurrency } from './utils/formatters.js';
 import {
   initSession,
   signIn,
@@ -491,9 +492,11 @@ async function checkConnectionStatus() {
   if (!status) {
     status = document.createElement('div');
     status.id = 'connection-status';
-    status.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: 500; transition: all 0.3s ease;';
+    status.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: 500; transition: all 0.3s ease;';
     status.title = 'Supabase connection status';
-    topBar.appendChild(status);
+      const rightCluster = document.getElementById('top-bar-right');
+      if (!rightCluster) return;
+      rightCluster.appendChild(status);
   }
 
   const configured = isConfigured && isConfigured();
@@ -635,7 +638,7 @@ function performSearch(query) {
         <div class="search-result-item" onclick="window.searchResultClick('tx', '${tx.id}')">
           <div style="font-weight:500;">${tx.title}</div>
           <div style="font-size:12px;color:var(--text-muted);">
-            ${new Date(tx.date).toLocaleDateString()} - ${fs?.name || '[Deleted]'} - ${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${tx.amount.toLocaleString()}`, { width: '8ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}
+            ${new Date(tx.date).toLocaleDateString()} - ${fs?.name || '[Deleted]'} - ${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}`, { width: '8ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}
           </div>
         </div>
       `;
@@ -648,7 +651,7 @@ function performSearch(query) {
       html += `
         <div class="search-result-item" onclick="window.searchResultClick('fs', '${fs.id}')">
           <div style="font-weight:500;">${fs.name}</div>
-          <div style="font-size:12px;color:var(--text-muted);">${fs.type} - ${sensitiveValueHtml(String(fs.balance?.toLocaleString() || '-'), { width: '8ch', copyValue: String(fs.balance || ''), copyLabel: 'Balance' })}</div>
+          <div style="font-size:12px;color:var(--text-muted);">${fs.type} - ${sensitiveValueHtml(formatCurrency(fs.balance || 0), { width: '8ch', copyValue: String(fs.balance || ''), copyLabel: 'Balance' })}</div>
         </div>
       `;
     });

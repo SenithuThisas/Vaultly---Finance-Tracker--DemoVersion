@@ -279,7 +279,6 @@
   <div class="main-wrapper" data-app-shell>
     <!-- Mobile top bar (visible only <768px) -->
     <header class="mobile-top-bar" id="mobile-top-bar">
-      <button class="hamburger" id="hamburger" aria-label="Open menu">☰</button>
       <span class="logo-text">Vaultly</span>
       <div class="top-actions-mobile">
         <button class="btn-icon privacy-toggle-btn" data-privacy-toggle-btn="true" aria-label="Toggle privacy mode" aria-pressed="true" title="Show sensitive values">
@@ -293,13 +292,15 @@
     <!-- Desktop top bar (visible only ≥768px) -->
     <header class="top-bar" id="top-bar">
       <div class="breadcrumb" id="breadcrumb">Dashboard</div>
-      <div class="top-actions">
-        <button class="btn btn-icon privacy-toggle-btn" data-privacy-toggle-btn="true" aria-label="Toggle privacy mode" aria-pressed="true" title="Show sensitive values">
-          <span class="material-icons privacy-eye-open">visibility</span>
-          <span class="material-icons privacy-eye-closed visible">visibility_off</span>
-        </button>
-        <button class="btn btn-icon" id="search-btn" title="Search (Ctrl+K)">🔍</button>
-        <button class="btn btn-icon" id="export-btn" title="Export CSV">📤</button>
+      <div class="top-bar-right" id="top-bar-right">
+        <div class="top-actions">
+          <button class="btn btn-icon" id="search-btn" title="Search (Ctrl+K)">🔍</button>
+          <button class="btn btn-icon privacy-toggle-btn" data-privacy-toggle-btn="true" aria-label="Toggle privacy mode" aria-pressed="true" title="Show sensitive values">
+            <span class="material-icons privacy-eye-open">visibility</span>
+            <span class="material-icons privacy-eye-closed visible">visibility_off</span>
+          </button>
+          <button class="btn btn-icon" id="export-btn" title="Export CSV">📤</button>
+        </div>
       </div>
     </header>
 
@@ -323,38 +324,53 @@
         <rect x="14" y="12" width="7" height="9" rx="1" />
         <rect x="3" y="16" width="7" height="5" rx="1" />
       </svg>
-      Home
+      <span class="tab-label">Dashboard</span>
     </button>
     <button class="tab-item" data-view="banks">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="4" width="20" height="16" rx="2" />
         <path d="M12 4v16" />
       </svg>
-      Accounts
+      <span class="tab-label">Accounts</span>
     </button>
     <button class="tab-item" data-view="transactions">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
-      Transactions
+      <span class="tab-label">Transactions</span>
     </button>
     <button class="tab-item" data-view="budgets">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
         <path d="M12 3v18" />
       </svg>
-      Budgets
+      <span class="tab-label">Budgets</span>
     </button>
-    <button class="tab-item" data-view="analytics">
+    <button class="tab-item" data-action="more" aria-label="More">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 3v18h18" />
-        <path d="M18 17V9" />
-        <path d="M13 17V5" />
-        <path d="M8 17v-3" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="19" cy="12" r="2" />
+        <circle cx="5" cy="12" r="2" />
       </svg>
-      Analytics
+      <span class="tab-label">More</span>
     </button>
   </nav>
+
+  <!-- Mobile More Drawer -->
+  <div class="mobile-drawer-overlay" id="mobile-more-overlay" data-app-shell></div>
+  <div class="mobile-drawer" id="mobile-more-drawer" data-app-shell>
+    <div class="drawer-drag-handle"></div>
+    <div class="mobile-drawer-header">
+      <h3>More</h3>
+      <button class="drawer-close" id="mobile-more-close">×</button>
+    </div>
+    <div class="mobile-drawer-body">
+      <button class="mobile-drawer-item" data-more-action="settings">Settings</button>
+      <button class="mobile-drawer-item" data-more-action="transfers">Transfers</button>
+      <button class="mobile-drawer-item" data-more-action="analytics">Analytics</button>
+      <button class="mobile-drawer-item mobile-drawer-danger" data-more-action="signout">Sign Out</button>
+    </div>
+  </div>
 
   <!-- Modal -->
   <div class="modal-overlay" id="modal-overlay" data-app-shell>
@@ -395,7 +411,7 @@
   </div>
 
   <!-- FAB -->
-  <button class="fab" id="add-fab" aria-label="Add transaction" data-app-shell>+</button>
+  <button class="fab" id="add-fab" aria-label="Add transaction" data-label="Add Transaction" data-app-shell>+</button>
 
   <div class="lock-screen" id="lock-screen">
     <div class="lock-card">

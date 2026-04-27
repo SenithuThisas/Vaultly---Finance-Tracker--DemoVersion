@@ -5,6 +5,7 @@
 import { getState } from '../state.js';
 import { TransactionService } from './transaction.service.js';
 import { FundSourceService } from './fundSource.service.js';
+import { formatCurrency } from '../utils/formatters.js';
 
 /** @type {Object} */
 export const AnalyticsService = {
@@ -170,7 +171,7 @@ export const AnalyticsService = {
     // Top spending category
     const topCats = this.getTopCategories(currentMonth, 1);
     if (topCats.length > 0) {
-      insights.push({ icon: '🏆', text: `Top spending: <strong>${topCats[0].category.label}</strong> at ${this._formatCurrency(topCats[0].amount)}`, type: 'info' });
+      insights.push({ icon: '🏆', text: `Top spending: <strong>${topCats[0].category.label}</strong> at ${formatCurrency(topCats[0].amount)}`, type: 'info' });
     }
 
     return insights;
@@ -201,12 +202,5 @@ export const AnalyticsService = {
     return CATEGORIES.find(c => c.id === id) || { id, label: id, emoji: '📦', color: '#888' };
   },
 
-  /**
-   * Helper: format currency
-   * @param {number} n
-   * @returns {string}
-   */
-  _formatCurrency(n) {
-    return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(n);
-  }
+  // TODO: Remove once analytics insights migrate to a UI renderer that can format values at display time.
 };

@@ -8,8 +8,8 @@ import { FundSourceService } from '../services/fundSource.service.js';
 import { BudgetService } from '../services/budget.service.js';
 import { AnalyticsService } from '../services/analytics.service.js';
 import { CATEGORIES } from '../data/seed.js';
-import { drawCashflowChart, drawDonutChart, formatCurrency, formatPct } from '../components/charts.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
+import { formatCurrency, formatPct } from '../utils/formatters.js';
 
 /**
  * Render dashboard view
@@ -32,41 +32,51 @@ export function renderDashboard() {
 
   const netWorth = AnalyticsService.getNetWorth();
   const savingsRate = AnalyticsService.getSavingsRate(curCr, curDr);
+  const hasAccounts = FundSourceService.getActive().length > 0;
+  const isEmptyStats = !hasAccounts && netWorth === 0 && curCr === 0 && curDr === 0;
+
+  // TODO: When migrating to component rendering, memoize stat cards to avoid re-render on unrelated updates.
+  const emptyStatHtml = `
+    <div class="stat-empty">
+      <div>Add an account to get started</div>
+      <div class="stat-empty-cta"><span class="cta-arrow">↗</span> Tap + to add</div>
+    </div>
+  `;
 
   const html = `
     <div class="view-header">
       <h2 class="view-title">Dashboard</h2>
     </div>
 
-    <div class="grid grid-4" style="margin-bottom: 32px;">
+    <div class="stat-grid" style="margin-bottom: 32px;">
       <div class="stat-card">
         <div class="stat-label">Net Worth</div>
-        <div class="stat-value" style="color: var(--accent-gold);">${sensitiveValueHtml(formatCurrency(netWorth), { width: '12ch', copyValue: String(netWorth), copyLabel: 'Net worth' })}</div>
+        <div class="stat-value" style="color: var(--accent-gold);">${isEmptyStats ? emptyStatHtml : sensitiveValueHtml(formatCurrency(netWorth), { width: '12ch', copyValue: String(netWorth), copyLabel: 'Net worth' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Income This Month</div>
-        <div class="stat-value" style="color: var(--accent-green);">${sensitiveValueHtml(formatCurrency(curCr), { width: '12ch', copyValue: String(curCr), copyLabel: 'Income' })}</div>
+        <div class="stat-value" style="color: var(--accent-green);">${isEmptyStats ? emptyStatHtml : sensitiveValueHtml(formatCurrency(curCr), { width: '12ch', copyValue: String(curCr), copyLabel: 'Income' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Expenses This Month</div>
-        <div class="stat-value" style="color: var(--accent-red);">${sensitiveValueHtml(formatCurrency(curDr), { width: '12ch', copyValue: String(curDr), copyLabel: 'Expense' })}</div>
+        <div class="stat-value" style="color: var(--accent-red);">${isEmptyStats ? emptyStatHtml : sensitiveValueHtml(formatCurrency(curDr), { width: '12ch', copyValue: String(curDr), copyLabel: 'Expense' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Savings Rate</div>
-        <div class="stat-value" style="color: ${savingsRate >= 20 ? 'var(--accent-green)' : 'var(--accent-gold)'};">${formatPct(savingsRate)}</div>
+        <div class="stat-value" style="color: ${savingsRate >= 20 ? 'var(--accent-green)' : 'var(--accent-gold)'};">${isEmptyStats ? emptyStatHtml : formatPct(savingsRate)}</div>
       </div>
     </div>
 
-    <div class="chart-container grid grid-2" style="margin-bottom: 32px;">
+    <div class="chart-container grid grid-2 dashboard-charts" style="margin-bottom: 32px;">
       <div class="chart-card">
         <h3 class="chart-title">Cashflow (6 Months)</h3>
-        <div class="cashflow-chart" id="cashflow-chart"></div>
+        <div class="cashflow-chart sensitive-visual" id="cashflow-chart"></div>
       </div>
       <div class="chart-card">
         <h3 class="chart-title">Spending by Category</h3>
         <div class="donut-chart">
-          <div class="donut-svg" id="donut-chart"></div>
-          <div class="donut-legend" id="donut-legend"></div>
+          <div class="donut-svg sensitive-visual" id="donut-chart"></div>
+          <div class="donut-legend sensitive-visual" id="donut-legend"></div>
         </div>
       </div>
     </div>
@@ -82,15 +92,19 @@ export function renderDashboard() {
   container.innerHTML = html;
 
   // Draw charts
-  setTimeout(() => {
-    drawCashflowChart(document.getElementById('cashflow-chart'), TransactionService.getMonthlyTotals(6));
-    renderDonut();
+  setTimeout(async () => {
+    const charts = await import('../components/charts.js');
+    const isSmall = window.innerWidth < 480;
+    const monthCount = isSmall ? 3 : 6;
+    charts.drawCashflowChart(document.getElementById('cashflow-chart'), TransactionService.getMonthlyTotals(monthCount));
+    renderDonut(charts.drawDonutChart, isSmall);
     renderRecentTransactions();
     renderBudgetHealth();
   }, 50);
 }
 
-function renderDonut() {
+function renderDonut(drawDonutChart, isSmall = false) {
+  if (!drawDonutChart) return;
   const now = new Date();
   const txs = TransactionService.getByMonth(now.getFullYear(), now.getMonth());
   const categoryTotals = TransactionService.getCategoryTotals(txs);
@@ -101,7 +115,7 @@ function renderDonut() {
       amount
     }))
     .sort((a, b) => b.amount - a.amount)
-    .slice(0, 5);
+    .slice(0, isSmall ? 4 : 5);
 
   const total = categories.reduce((s, c) => s + c.amount, 0);
 

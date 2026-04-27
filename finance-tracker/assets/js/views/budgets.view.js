@@ -7,7 +7,7 @@ import { BudgetService } from '../services/budget.service.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { CATEGORIES, DR_CATEGORIES } from '../data/seed.js';
-import { formatCurrency, formatPct } from '../components/charts.js';
+import { formatCurrency, formatPct } from '../utils/formatters.js';
 import { canSubmit, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
 

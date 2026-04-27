@@ -52,16 +52,43 @@ export function closeDrawer() {
 export function initDrawer() {
   const overlay = document.getElementById('drawer-overlay');
   const closeBtn = document.getElementById('drawer-close');
+  const drawer = document.getElementById('tx-drawer');
 
   overlay.addEventListener('click', closeDrawer);
   closeBtn.addEventListener('click', closeDrawer);
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      const drawer = document.getElementById('tx-drawer');
       if (drawer.classList.contains('open')) {
         closeDrawer();
       }
     }
   });
+
+  if (drawer) {
+    let startY = 0;
+    let tracking = false;
+
+    drawer.addEventListener('touchstart', event => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      startY = touch.clientY;
+      tracking = true;
+    }, { passive: true });
+
+    drawer.addEventListener('touchmove', event => {
+      if (!tracking) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      const deltaY = touch.clientY - startY;
+      if (deltaY > 90) {
+        closeDrawer();
+        tracking = false;
+      }
+    }, { passive: true });
+
+    drawer.addEventListener('touchend', () => {
+      tracking = false;
+    });
+  }
 }

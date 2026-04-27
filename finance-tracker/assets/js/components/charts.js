@@ -2,33 +2,7 @@
  * @fileoverview SVG chart drawing utilities
  */
 
-/**
- * Format currency for charts
- * @param {number} n
- * @returns {string}
- */
-export function formatCurrency(n) {
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
-    maximumFractionDigits: 0
-  }).format(n);
-}
-
-/**
- * Format compact number
- * @param {number} n
- * @returns {string}
- */
-export function formatCompact(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return n.toString();
-}
-
-export function formatPct(n) {
-  return n.toFixed(1) + '%';
-}
+import { formatCurrency, formatCompact } from '../utils/formatters.js';
 
 /**
  * Draw cashflow bar chart
@@ -36,8 +10,21 @@ export function formatPct(n) {
  * @param {Array} data - Array of {label, cr, dr, net}
  */
 export function drawCashflowChart(container, data) {
-  if (!data || data.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">No data available</div></div>';
+  const isEmpty = !data || data.length === 0 || data.every(item => (item.cr || 0) === 0 && (item.dr || 0) === 0);
+  if (isEmpty) {
+    container.innerHTML = `
+      <div class="chart-empty">
+        <div class="chart-empty-illustration">
+          <svg viewBox="0 0 160 90" aria-hidden="true">
+            <path d="M10 70 L50 40 L90 52 L130 22" stroke="var(--accent-gold)" stroke-width="4" fill="none" stroke-linecap="round" />
+            <circle cx="50" cy="40" r="4" fill="var(--accent-gold)" />
+            <circle cx="90" cy="52" r="4" fill="var(--accent-gold)" />
+            <circle cx="130" cy="22" r="4" fill="var(--accent-gold)" />
+          </svg>
+        </div>
+        <div class="chart-empty-text">Add an account to see cashflow history</div>
+      </div>
+    `;
     return;
   }
 
@@ -59,10 +46,13 @@ export function drawCashflowChart(container, data) {
     svg += `<text x="30" y="${y + 4}" class="chart-axis-label" text-anchor="end">${formatCompact(value)}</text>`;
   }
 
+  const compactLabels = width < 420;
+
   data.forEach((d, i) => {
     const x = startX + i * (barWidth * 2 + gap);
     const crHeight = (d.cr / maxValue) * chartHeight;
     const drHeight = (d.dr / maxValue) * chartHeight;
+    const label = compactLabels ? String(d.label || '').slice(0, 3) : d.label;
 
     svg += `
       <rect x="${x}" y="${20 + chartHeight - crHeight}" width="${barWidth}" height="${crHeight}" fill="#10B981" opacity="0.9" rx="3">
@@ -73,7 +63,7 @@ export function drawCashflowChart(container, data) {
         <animate attributeName="height" from="0" to="${drHeight}" dur="0.5s" fill="freeze" begin="${i * 0.1}s"/>
         <animate attributeName="y" from="${20 + chartHeight}" to="${20 + chartHeight - drHeight}" dur="0.5s" fill="freeze" begin="${i * 0.1}s"/>
       </rect>
-      <text x="${x + barWidth + 2}" y="${height - 10}" fill="#888" font-size="11" text-anchor="middle">${d.label}</text>
+      <text x="${x + barWidth + 2}" y="${height - 10}" fill="#888" font-size="11" text-anchor="middle">${label}</text>
     `;
   });
 
@@ -90,7 +80,7 @@ export function drawCashflowChart(container, data) {
  */
 export function drawDonutChart(container, legendContainer, data, total) {
   if (!data || data.length === 0 || total === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🥧</div><div class="empty-text">No spending data</div></div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🥧</div><div class="empty-text">No spending data yet</div></div>';
     legendContainer.innerHTML = '';
     return;
   }
@@ -166,6 +156,8 @@ export function drawLineChart(container, values, labels, color = '#F4B942') {
   let pathD = '';
   const stepX = (width - padding * 2) / (values.length - 1);
 
+  const compactLabels = width < 360;
+
   values.forEach((v, i) => {
     const x = padding + i * stepX;
     const y = height - padding - ((v - min) / (max - min || 1)) * (height - padding * 2);
@@ -191,7 +183,9 @@ export function drawLineChart(container, values, labels, color = '#F4B942') {
     svg += `<circle cx="${x}" cy="${y}" r="4" fill="${color}">
       <animate attributeName="r" from="0" to="4" dur="0.3s" begin="${i * 0.15}s" fill="freeze"/>
     </circle>`;
-    svg += `<text x="${x}" y="${height - 5}" fill="#888" font-size="10" text-anchor="middle">${labels[i] || ''}</text>`;
+    if (!compactLabels) {
+      svg += `<text x="${x}" y="${height - 5}" fill="#888" font-size="10" text-anchor="middle">${labels[i] || ''}</text>`;
+    }
   });
 
   svg += '</svg>';

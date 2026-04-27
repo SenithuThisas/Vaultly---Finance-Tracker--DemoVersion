@@ -9,8 +9,9 @@ import { AnalyticsService } from '../services/analytics.service.js';
 import { RecurringService } from '../services/recurring.service.js';
 import { BudgetService } from '../services/budget.service.js';
 import { CATEGORIES } from '../data/seed.js';
-import { drawLineChart, drawBarChart, drawHeatmap, formatCurrency, formatPct } from '../components/charts.js';
+import { drawLineChart, drawBarChart, drawHeatmap } from '../components/charts.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
+import { formatCurrency, formatPct } from '../utils/formatters.js';
 
 /**
  * Render analytics view
@@ -55,7 +56,7 @@ export function renderAnalytics() {
       <div class="stat-card">
         <div class="stat-label">Highest Single DR</div>
         <div class="stat-value" style="font-size: 22px; color: var(--accent-red);">
-          ${sensitiveValueHtml(Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount)).toLocaleString('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }), { width: '11ch', copyValue: String(Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount))), copyLabel: 'Highest debit' })}
+          ${sensitiveValueHtml(formatCurrency(Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount))), { width: '11ch', copyValue: String(Math.max(0, ...currentMonth.filter(tx => tx.type === 'DR').map(tx => tx.amount))), copyLabel: 'Highest debit' })}
         </div>
       </div>
       <div class="stat-card">
@@ -67,22 +68,22 @@ export function renderAnalytics() {
     <div class="grid grid-2" style="margin-bottom: 32px;">
       <div class="chart-card">
         <h3 class="chart-title">Net Cashflow (6 Months)</h3>
-        <div id="net-cashflow-chart" style="height: 200px;"></div>
+        <div id="net-cashflow-chart" class="sensitive-visual" style="height: 200px;"></div>
       </div>
       <div class="chart-card">
         <h3 class="chart-title">Fund Source Allocation</h3>
-        <div id="allocation-chart" style="height: 200px;"></div>
+        <div id="allocation-chart" class="sensitive-visual" style="height: 200px;"></div>
       </div>
     </div>
 
     <div class="grid grid-2" style="margin-bottom: 32px;">
       <div class="chart-card">
         <h3 class="chart-title">Top Spending Categories</h3>
-        <div id="top-categories-chart" style="height: 200px;"></div>
+        <div id="top-categories-chart" class="sensitive-visual" style="height: 200px;"></div>
       </div>
       <div class="chart-card">
         <h3 class="chart-title">Spending Heatmap (Last 35 Days)</h3>
-        <div id="heatmap-chart" style="padding: 16px 0;"></div>
+        <div id="heatmap-chart" class="sensitive-visual" style="padding: 16px 0;"></div>
       </div>
     </div>
 

@@ -207,13 +207,20 @@
 
 .top-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .btn-icon {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -354,158 +361,3 @@
 .gap-12 { gap: 12px; }
 .gap-16 { gap: 16px; }
 .gap-24 { gap: 24px; }
-
-/* ══════════════════════════════════════════════
-   ≥ 480px — 2 col grids
-   ══════════════════════════════════════════════ */
-@media (min-width: 480px) {
-  .grid-2,
-  .grid-3,
-  .grid-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* ══════════════════════════════════════════════
-   ≥ 768px — TABLET: icon sidebar, hide mobile bar
-   ══════════════════════════════════════════════ */
-@media (min-width: 768px) {
-  /* Sidebar: icon-only, always visible */
-  .sidebar {
-    width: 70px;
-    transform: translateX(0);
-  }
-
-  .sidebar .nav-link-text,
-  .sidebar .logo span,
-  .sidebar .nav-badge {
-    display: none;
-  }
-
-  .sidebar .logo h1 {
-    font-size: 14px;
-    text-align: center;
-  }
-
-  .sidebar .logo {
-    padding: 14px 8px;
-    text-align: center;
-  }
-
-  .sidebar .nav-link {
-    justify-content: center;
-    padding: 14px 0;
-    border-left: none;
-    border-right: 3px solid transparent;
-    position: relative;
-  }
-
-  .sidebar .nav-link.active {
-    border-left-color: transparent;
-    border-right-color: var(--accent-gold);
-  }
-
-  /* Tooltip on hover */
-  .sidebar .nav-link[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    left: calc(100% + 8px);
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--bg-elevated);
-    color: var(--text-primary);
-    padding: 6px 12px;
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition-fast);
-    z-index: 300;
-    box-shadow: var(--shadow-card);
-  }
-
-  .sidebar .nav-link[data-tooltip]:hover::after {
-    opacity: 1;
-  }
-
-  /* Hide mobile elements */
-  .mobile-top-bar {
-    display: none !important;
-  }
-
-  .bottom-tab-bar {
-    display: none !important;
-  }
-
-  .mobile-overlay {
-    display: none !important;
-  }
-
-  /* Show desktop top bar */
-  .top-bar {
-    display: flex;
-  }
-
-  /* Main wrapper shifts for icon sidebar */
-  .main-wrapper {
-    margin-left: 70px;
-    width: calc(100% - 70px);
-  }
-
-  /* Views: no bottom bar padding needed */
-  .view {
-    padding-bottom: var(--page-padding);
-  }
-
-  .grid-3 {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* ══════════════════════════════════════════════
-   ≥ 1024px — DESKTOP: full sidebar
-   ══════════════════════════════════════════════ */
-@media (min-width: 1024px) {
-  .sidebar {
-    width: 260px;
-  }
-
-  /* Show text labels again */
-  .sidebar .nav-link-text,
-  .sidebar .logo span,
-  .sidebar .nav-badge {
-    display: inline;
-  }
-
-  .sidebar .logo h1 {
-    font-size: 24px;
-    text-align: left;
-  }
-
-  .sidebar .logo {
-    padding: 24px;
-    text-align: left;
-  }
-
-  .sidebar .nav-link {
-    justify-content: flex-start;
-    padding: 12px 24px;
-    border-right: none;
-    border-left: 3px solid transparent;
-  }
-
-  .sidebar .nav-link.active {
-    border-right-color: transparent;
-    border-left-color: var(--accent-gold);
-  }
-
-  .main-wrapper {
-    margin-left: 260px;
-    width: calc(100% - 260px);
-  }
-
-  .grid-4 {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
