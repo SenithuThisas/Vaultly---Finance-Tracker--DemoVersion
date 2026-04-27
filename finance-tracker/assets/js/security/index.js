@@ -270,13 +270,15 @@ export function sanitizeFormData(data) {
 }
 
 export function sanitizeAccountNumber(number) {
-  return String(number || '').replace(/\D/g, '').slice(-4);
+  return String(number || '').replace(/\D/g, '').slice(0, 24);
 }
 
 export function maskAccountNumber(number) {
   if (!number) return '';
-  const str = String(number);
-  return `••••${str.slice(-4)}`;
+  const str = String(number).replace(/\D/g, '');
+  if (!str) return '';
+  if (str.length <= 4) return str;
+  return `•••• ${str.slice(-4)}`;
 }
 
 export function validate(schema, data) {
