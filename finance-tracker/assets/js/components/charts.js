@@ -2,33 +2,7 @@
  * @fileoverview SVG chart drawing utilities
  */
 
-/**
- * Format currency for charts
- * @param {number} n
- * @returns {string}
- */
-export function formatCurrency(n) {
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
-    maximumFractionDigits: 0
-  }).format(n);
-}
-
-/**
- * Format compact number
- * @param {number} n
- * @returns {string}
- */
-export function formatCompact(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return n.toString();
-}
-
-export function formatPct(n) {
-  return n.toFixed(1) + '%';
-}
+import { formatCurrency, formatCompact } from '../utils/formatters.js';
 
 /**
  * Draw cashflow bar chart
@@ -36,8 +10,21 @@ export function formatPct(n) {
  * @param {Array} data - Array of {label, cr, dr, net}
  */
 export function drawCashflowChart(container, data) {
-  if (!data || data.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">No data available</div></div>';
+  const isEmpty = !data || data.length === 0 || data.every(item => (item.cr || 0) === 0 && (item.dr || 0) === 0);
+  if (isEmpty) {
+    container.innerHTML = `
+      <div class="chart-empty">
+        <div class="chart-empty-illustration">
+          <svg viewBox="0 0 160 90" aria-hidden="true">
+            <path d="M10 70 L50 40 L90 52 L130 22" stroke="var(--accent-gold)" stroke-width="4" fill="none" stroke-linecap="round" />
+            <circle cx="50" cy="40" r="4" fill="var(--accent-gold)" />
+            <circle cx="90" cy="52" r="4" fill="var(--accent-gold)" />
+            <circle cx="130" cy="22" r="4" fill="var(--accent-gold)" />
+          </svg>
+        </div>
+        <div class="chart-empty-text">Add an account to see cashflow history</div>
+      </div>
+    `;
     return;
   }
 
@@ -90,7 +77,7 @@ export function drawCashflowChart(container, data) {
  */
 export function drawDonutChart(container, legendContainer, data, total) {
   if (!data || data.length === 0 || total === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🥧</div><div class="empty-text">No spending data</div></div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🥧</div><div class="empty-text">No spending data yet</div></div>';
     legendContainer.innerHTML = '';
     return;
   }
