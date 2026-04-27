@@ -5,7 +5,8 @@
 import { getState, registerViewRenderer, dispatch } from '../state.js';
 import { FundSourceService } from '../services/fundSource.service.js';
 import { TransactionService } from '../services/transaction.service.js';
-import { drawSparkline, formatCurrency } from '../components/charts.js';
+import { drawSparkline } from '../components/charts.js';
+import { formatCurrency } from '../utils/formatters.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { CATEGORIES, FUND_SOURCE_TYPES, CURRENCIES } from '../data/seed.js';
