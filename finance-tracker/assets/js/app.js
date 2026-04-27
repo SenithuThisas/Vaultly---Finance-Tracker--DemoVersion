@@ -23,6 +23,7 @@ import {
   logSecurityEvent,
   showErrorModal
 } from './security/index.js';
+import { initPrivacyControls, sensitiveValueHtml } from './security/privacy.js';
 import {
   initSession,
   signIn,
@@ -175,6 +176,7 @@ function initCoreUI() {
   initModal();
   initDrawer();
   initNav();
+  initPrivacyControls();
   setupMobileViewport();
   registerKeyboardShortcuts();
   registerGlobalSearch();
@@ -633,7 +635,7 @@ function performSearch(query) {
         <div class="search-result-item" onclick="window.searchResultClick('tx', '${tx.id}')">
           <div style="font-weight:500;">${tx.title}</div>
           <div style="font-size:12px;color:var(--text-muted);">
-            ${new Date(tx.date).toLocaleDateString()} - ${fs?.name || '[Deleted]'} - ${tx.type === 'CR' ? '+' : '-'}${tx.amount.toLocaleString()}
+            ${new Date(tx.date).toLocaleDateString()} - ${fs?.name || '[Deleted]'} - ${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${tx.amount.toLocaleString()}`, { width: '8ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}
           </div>
         </div>
       `;
@@ -646,7 +648,7 @@ function performSearch(query) {
       html += `
         <div class="search-result-item" onclick="window.searchResultClick('fs', '${fs.id}')">
           <div style="font-weight:500;">${fs.name}</div>
-          <div style="font-size:12px;color:var(--text-muted);">${fs.type} - ${fs.balance?.toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--text-muted);">${fs.type} - ${sensitiveValueHtml(String(fs.balance?.toLocaleString() || '-'), { width: '8ch', copyValue: String(fs.balance || ''), copyLabel: 'Balance' })}</div>
         </div>
       `;
     });
