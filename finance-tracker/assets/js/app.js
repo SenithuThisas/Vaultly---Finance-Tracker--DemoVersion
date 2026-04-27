@@ -492,9 +492,11 @@ async function checkConnectionStatus() {
   if (!status) {
     status = document.createElement('div');
     status.id = 'connection-status';
-    status.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: 500; transition: all 0.3s ease;';
+    status.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: 500; transition: all 0.3s ease;';
     status.title = 'Supabase connection status';
-    topBar.appendChild(status);
+      const rightCluster = document.getElementById('top-bar-right');
+      if (!rightCluster) return;
+      rightCluster.appendChild(status);
   }
 
   const configured = isConfigured && isConfigured();

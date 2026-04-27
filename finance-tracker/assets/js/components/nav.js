@@ -11,10 +11,13 @@ import { BudgetService } from '../services/budget.service.js';
  */
 export function initNav() {
   const navLinks = document.querySelectorAll('.nav-link[data-view]');
-  const hamburger = document.getElementById('hamburger');
   const mobileOverlay = document.getElementById('mobile-overlay');
   const bottomTabBar = document.getElementById('bottom-tab-bar');
   const mobileSearchBtn = document.getElementById('mobile-search-btn');
+  const moreDrawer = document.getElementById('mobile-more-drawer');
+  const moreOverlay = document.getElementById('mobile-more-overlay');
+  const moreClose = document.getElementById('mobile-more-close');
+  const sidebar = document.getElementById('sidebar');
 
   // Sidebar nav click handlers
   navLinks.forEach(link => {
@@ -33,19 +36,16 @@ export function initNav() {
     bottomTabBar.querySelectorAll('.tab-item').forEach(tab => {
       tab.addEventListener('click', () => {
         const view = tab.dataset.view;
+        const action = tab.dataset.action;
         if (view) {
           navigateTo(view);
           updateBottomTabBar(view);
+          return;
+        }
+        if (action === 'more') {
+          openMoreDrawer();
         }
       });
-    });
-  }
-
-  // Mobile hamburger
-  if (hamburger) {
-    hamburger.addEventListener('click', () => {
-      document.getElementById('sidebar')?.classList.toggle('open');
-      mobileOverlay?.classList.toggle('open');
     });
   }
 
@@ -53,6 +53,39 @@ export function initNav() {
   if (mobileOverlay) {
     mobileOverlay.addEventListener('click', closeMobileNav);
   }
+
+  if (moreOverlay) {
+    moreOverlay.addEventListener('click', closeMoreDrawer);
+  }
+
+  moreClose?.addEventListener('click', closeMoreDrawer);
+
+  if (moreDrawer) {
+    moreDrawer.addEventListener('click', event => {
+      const action = event.target.closest('[data-more-action]')?.dataset.moreAction;
+      if (!action) return;
+
+      if (action === 'settings') {
+        document.getElementById('settings-btn')?.click();
+      } else if (action === 'transfers') {
+        navigateTo('transfers');
+      } else if (action === 'analytics') {
+        navigateTo('analytics');
+      } else if (action === 'signout') {
+        document.getElementById('sidebar-signout-btn')?.click();
+      }
+      closeMoreDrawer();
+    });
+  }
+
+  // Sidebar expand on tap (tablet)
+  sidebar?.addEventListener('click', event => {
+    const isToggleArea = event.target.closest('.logo');
+    if (!isToggleArea) return;
+    sidebar.classList.toggle('expanded');
+  });
+
+  registerSidebarSwipe(sidebar);
 
   // Mobile search button — triggers same search as desktop
   if (mobileSearchBtn) {
@@ -75,6 +108,47 @@ export function initNav() {
 function closeMobileNav() {
   document.getElementById('sidebar')?.classList.remove('open');
   document.getElementById('mobile-overlay')?.classList.remove('open');
+}
+
+function openMoreDrawer() {
+  document.getElementById('mobile-more-drawer')?.classList.add('open');
+  document.getElementById('mobile-more-overlay')?.classList.add('open');
+}
+
+function closeMoreDrawer() {
+  document.getElementById('mobile-more-drawer')?.classList.remove('open');
+  document.getElementById('mobile-more-overlay')?.classList.remove('open');
+}
+
+function registerSidebarSwipe(sidebar) {
+  if (!sidebar) return;
+  let startX = 0;
+  let startY = 0;
+  let isTracking = false;
+
+  document.addEventListener('touchstart', event => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    isTracking = startX < 24;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', event => {
+    if (!isTracking) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - startX;
+    const deltaY = Math.abs(touch.clientY - startY);
+    if (deltaX > 60 && deltaY < 40 && window.innerWidth >= 768) {
+      sidebar.classList.add('expanded');
+      isTracking = false;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    isTracking = false;
+  });
 }
 
 /**

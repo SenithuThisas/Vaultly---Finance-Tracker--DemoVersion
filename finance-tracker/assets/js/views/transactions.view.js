@@ -65,7 +65,7 @@ export function renderTransactions() {
               <th data-sort="date">Date</th>
               <th>Category</th>
               <th data-sort="title">Title</th>
-              <th>Account</th>
+              <th class="col-account">Account</th>
               <th data-sort="amount">Amount</th>
               <th></th>
             </tr>
@@ -189,7 +189,7 @@ function renderTransactionTable() {
         <td class="mono">${date}</td>
         <td><span class="badge badge-${typeClass}">${cat.emoji} ${cat.label}</span></td>
         <td>${tx.title}</td>
-        <td>${fs?.name || '[Deleted]'}</td>
+        <td class="col-account">${fs?.name || '[Deleted]'}</td>
         <td class="mono tx-amount ${typeClass}">${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}`, { width: '10ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}</td>
         <td><span class="tx-delete" onclick="window.deleteTransaction('${tx.id}')">🗑️</span></td>
       </tr>

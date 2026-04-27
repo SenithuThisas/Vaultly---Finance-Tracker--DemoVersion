@@ -46,10 +46,13 @@ export function drawCashflowChart(container, data) {
     svg += `<text x="30" y="${y + 4}" class="chart-axis-label" text-anchor="end">${formatCompact(value)}</text>`;
   }
 
+  const compactLabels = width < 420;
+
   data.forEach((d, i) => {
     const x = startX + i * (barWidth * 2 + gap);
     const crHeight = (d.cr / maxValue) * chartHeight;
     const drHeight = (d.dr / maxValue) * chartHeight;
+    const label = compactLabels ? String(d.label || '').slice(0, 3) : d.label;
 
     svg += `
       <rect x="${x}" y="${20 + chartHeight - crHeight}" width="${barWidth}" height="${crHeight}" fill="#10B981" opacity="0.9" rx="3">
@@ -60,7 +63,7 @@ export function drawCashflowChart(container, data) {
         <animate attributeName="height" from="0" to="${drHeight}" dur="0.5s" fill="freeze" begin="${i * 0.1}s"/>
         <animate attributeName="y" from="${20 + chartHeight}" to="${20 + chartHeight - drHeight}" dur="0.5s" fill="freeze" begin="${i * 0.1}s"/>
       </rect>
-      <text x="${x + barWidth + 2}" y="${height - 10}" fill="#888" font-size="11" text-anchor="middle">${d.label}</text>
+      <text x="${x + barWidth + 2}" y="${height - 10}" fill="#888" font-size="11" text-anchor="middle">${label}</text>
     `;
   });
 
@@ -153,6 +156,8 @@ export function drawLineChart(container, values, labels, color = '#F4B942') {
   let pathD = '';
   const stepX = (width - padding * 2) / (values.length - 1);
 
+  const compactLabels = width < 360;
+
   values.forEach((v, i) => {
     const x = padding + i * stepX;
     const y = height - padding - ((v - min) / (max - min || 1)) * (height - padding * 2);
@@ -178,7 +183,9 @@ export function drawLineChart(container, values, labels, color = '#F4B942') {
     svg += `<circle cx="${x}" cy="${y}" r="4" fill="${color}">
       <animate attributeName="r" from="0" to="4" dur="0.3s" begin="${i * 0.15}s" fill="freeze"/>
     </circle>`;
-    svg += `<text x="${x}" y="${height - 5}" fill="#888" font-size="10" text-anchor="middle">${labels[i] || ''}</text>`;
+    if (!compactLabels) {
+      svg += `<text x="${x}" y="${height - 5}" fill="#888" font-size="10" text-anchor="middle">${labels[i] || ''}</text>`;
+    }
   });
 
   svg += '</svg>';

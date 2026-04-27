@@ -67,7 +67,7 @@ export function renderDashboard() {
       </div>
     </div>
 
-    <div class="chart-container grid grid-2" style="margin-bottom: 32px;">
+    <div class="chart-container grid grid-2 dashboard-charts" style="margin-bottom: 32px;">
       <div class="chart-card">
         <h3 class="chart-title">Cashflow (6 Months)</h3>
         <div class="cashflow-chart sensitive-visual" id="cashflow-chart"></div>
@@ -94,14 +94,16 @@ export function renderDashboard() {
   // Draw charts
   setTimeout(async () => {
     const charts = await import('../components/charts.js');
-    charts.drawCashflowChart(document.getElementById('cashflow-chart'), TransactionService.getMonthlyTotals(6));
-    renderDonut(charts.drawDonutChart);
+    const isSmall = window.innerWidth < 480;
+    const monthCount = isSmall ? 3 : 6;
+    charts.drawCashflowChart(document.getElementById('cashflow-chart'), TransactionService.getMonthlyTotals(monthCount));
+    renderDonut(charts.drawDonutChart, isSmall);
     renderRecentTransactions();
     renderBudgetHealth();
   }, 50);
 }
 
-function renderDonut(drawDonutChart) {
+function renderDonut(drawDonutChart, isSmall = false) {
   if (!drawDonutChart) return;
   const now = new Date();
   const txs = TransactionService.getByMonth(now.getFullYear(), now.getMonth());
@@ -113,7 +115,7 @@ function renderDonut(drawDonutChart) {
       amount
     }))
     .sort((a, b) => b.amount - a.amount)
-    .slice(0, 5);
+    .slice(0, isSmall ? 4 : 5);
 
   const total = categories.reduce((s, c) => s + c.amount, 0);
 
