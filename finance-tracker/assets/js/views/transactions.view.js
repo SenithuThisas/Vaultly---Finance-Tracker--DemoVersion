@@ -9,7 +9,7 @@ import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { openDrawer, closeDrawer } from '../components/drawer.js';
 import { CATEGORIES, CR_CATEGORIES, DR_CATEGORIES, CURRENCIES } from '../data/seed.js';
-import { formatCurrency } from '../components/charts.js';
+import { formatCurrency } from '../utils/formatters.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
 
