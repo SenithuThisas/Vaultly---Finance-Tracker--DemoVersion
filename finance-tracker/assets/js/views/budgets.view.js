@@ -9,6 +9,7 @@ import { openModal } from '../components/modal.js';
 import { CATEGORIES, DR_CATEGORIES } from '../data/seed.js';
 import { formatCurrency, formatPct } from '../components/charts.js';
 import { canSubmit, translateError } from '../security/index.js';
+import { sensitiveValueHtml } from '../security/privacy.js';
 
 /**
  * Render budgets view
@@ -30,15 +31,15 @@ export function renderBudgets() {
     <div class="grid grid-4" style="margin-bottom: 32px;">
       <div class="stat-card">
         <div class="stat-label">Total Budgeted</div>
-        <div class="stat-value">${formatCurrency(summary.totalBudgeted)}</div>
+        <div class="stat-value">${sensitiveValueHtml(formatCurrency(summary.totalBudgeted), { width: '11ch', copyValue: String(summary.totalBudgeted), copyLabel: 'Total budgeted' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Total Spent</div>
-        <div class="stat-value" style="color: var(--accent-red);">${formatCurrency(summary.totalSpent)}</div>
+        <div class="stat-value" style="color: var(--accent-red);">${sensitiveValueHtml(formatCurrency(summary.totalSpent), { width: '11ch', copyValue: String(summary.totalSpent), copyLabel: 'Total spent' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Remaining</div>
-        <div class="stat-value" style="color: ${summary.totalRemaining >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">${formatCurrency(summary.totalRemaining)}</div>
+        <div class="stat-value" style="color: ${summary.totalRemaining >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">${sensitiveValueHtml(formatCurrency(summary.totalRemaining), { width: '11ch', copyValue: String(summary.totalRemaining), copyLabel: 'Remaining budget' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Utilization</div>
@@ -68,7 +69,7 @@ export function renderBudgets() {
                   <span>${cat.emoji}</span>
                   <span>${cat.label}</span>
                 </div>
-                <div style="font-family: var(--font-mono); color: var(--accent-red);">${formatCurrency(ub.spent)}</div>
+                <div style="font-family: var(--font-mono); color: var(--accent-red);">${sensitiveValueHtml(formatCurrency(ub.spent), { width: '10ch', copyValue: String(ub.spent), copyLabel: 'Unbudgeted spend' })}</div>
                 <button class="btn btn-sm btn-secondary" style="margin-top: 8px; width: 100%;" onclick="window.quickAddBudget('${ub.category}')">+ Add Budget</button>
               </div>
             `;
@@ -105,7 +106,7 @@ function renderBudgetCards(statuses) {
           <button class="btn btn-sm btn-ghost" data-action="delete" data-id="${b.id}" style="padding: 4px 8px;">🗑️</button>
         </div>
         <div class="budget-amount" style="font-family: var(--font-mono); font-size: 18px; margin-bottom: 12px;">
-          ${formatCurrency(b.spent)} <span style="color: var(--text-muted); font-size: 14px;">/ ${formatCurrency(b.limit)}</span>
+          ${sensitiveValueHtml(formatCurrency(b.spent), { width: '10ch', copyValue: String(b.spent), copyLabel: 'Budget spent' })} <span style="color: var(--text-muted); font-size: 14px;">/ ${sensitiveValueHtml(formatCurrency(b.limit), { width: '10ch', copyValue: String(b.limit), copyLabel: 'Budget limit' })}</span>
         </div>
         <div class="progress-bar">
           <div class="progress-fill ${fillClass}" style="width: ${Math.min(b.utilization, 100)}%"></div>
@@ -113,7 +114,7 @@ function renderBudgetCards(statuses) {
         <div class="budget-status">
           <span class="budget-spent">${b.utilization.toFixed(1)}% used</span>
           <span class="budget-remaining" style="color: ${b.remaining >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
-            ${b.remaining >= 0 ? formatCurrency(b.remaining) + ' left' : formatCurrency(Math.abs(b.remaining)) + ' over'}
+            ${b.remaining >= 0 ? `${sensitiveValueHtml(formatCurrency(b.remaining), { width: '10ch', copyValue: String(b.remaining), copyLabel: 'Budget remaining' })} left` : `${sensitiveValueHtml(formatCurrency(Math.abs(b.remaining)), { width: '10ch', copyValue: String(Math.abs(b.remaining)), copyLabel: 'Budget overage' })} over`}
           </span>
         </div>
       </div>
