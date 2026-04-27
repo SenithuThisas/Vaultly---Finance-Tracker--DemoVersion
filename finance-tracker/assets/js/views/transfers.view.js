@@ -8,7 +8,7 @@ import { FundSourceService } from '../services/fundSource.service.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { openDrawer, closeDrawer } from '../components/drawer.js';
-import { formatCurrency } from '../components/charts.js';
+import { formatCurrency } from '../utils/formatters.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
 
