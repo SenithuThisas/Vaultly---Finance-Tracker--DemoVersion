@@ -12,10 +12,12 @@ import {
   setButtonLoading,
   setButtonReady
 } from './index.js';
-import { requireAuth, requireGuest } from './guards.js';
+import { showToast } from '../components/toast.js';
+import { requireAuth } from './guards.js';
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const IDLE_TIMEOUT_KEY = 'vaultly.idle-timeout-ms';
+const SESSION_CHECK_INTERVAL_MS = 240000;
 
 let currentUser = null;
 let idleTimer = null;
@@ -25,6 +27,7 @@ let lastViewBeforeLock = 'dashboard';
 let authSubscription = null;
 let idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
 let lastActivityTime = 0;
+let sessionCheckInterval = null;
 
 function getSessionStorageKeys() {
   const projectRef = (db?.supabaseUrl || '').split('//')[1]?.split('.')[0];
@@ -130,6 +133,7 @@ export async function initSession({
       clearAppState,
       clearUserCache,
       showToast,
+      showSessionExpired,
       showPasswordRecovery
     });
   } catch (err) {
@@ -156,7 +160,7 @@ function handleSessionExpired({ showSessionExpired, clearAppState, clearUserCach
   showSessionExpired(lastViewBeforeLock);
 }
 
-function setupAuthListener({ showAuthScreen, hideAuthScreen, showApp, hideApp, loadUserData, clearAppState, clearUserCache, showToast, showPasswordRecovery }) {
+function setupAuthListener({ showAuthScreen, hideAuthScreen, showApp, hideApp, loadUserData, clearAppState, clearUserCache, showToast, showSessionExpired, showPasswordRecovery }) {
   if (!db) return;
   if (authSubscription) {
     authSubscription.subscription?.unsubscribe();
@@ -174,6 +178,7 @@ function setupAuthListener({ showAuthScreen, hideAuthScreen, showApp, hideApp, l
         logSecurityEvent({ type: 'LOGIN_SUCCESS', details: { email: currentUser?.email } });
         break;
       case 'SIGNED_OUT':
+        clearSessionCheckInterval();
         currentUser = null;
         clearAppState();
         clearUserCache();
@@ -197,6 +202,40 @@ function setupAuthListener({ showAuthScreen, hideAuthScreen, showApp, hideApp, l
         break;
     }
   });
+
+  startPeriodicSessionCheck({ showSessionExpired });
+}
+
+function clearSessionCheckInterval() {
+  if (sessionCheckInterval) {
+    clearInterval(sessionCheckInterval);
+    sessionCheckInterval = null;
+  }
+}
+
+function isSessionExpired(session) {
+  const now = Math.floor(Date.now() / 1000);
+  return !session?.expires_at || session.expires_at < now;
+}
+
+function startPeriodicSessionCheck({ showSessionExpired }) {
+  clearSessionCheckInterval();
+
+  sessionCheckInterval = setInterval(async () => {
+    if (!db || !currentUser) return;
+
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      if (!session || isSessionExpired(session)) {
+        showSessionExpired(lastViewBeforeLock);
+        await signOut('local');
+      }
+    } catch (error) {
+      console.error('Periodic session check failed:', error);
+      showSessionExpired(lastViewBeforeLock);
+      await signOut('local');
+    }
+  }, SESSION_CHECK_INTERVAL_MS);
 }
 
 function setupStorageSync({ showAuthScreen, showApp, hideApp, clearAppState, showToast }) {
@@ -349,7 +388,7 @@ function shakeLockInput() {
   input.classList.add('shake');
 }
 
-export async function signIn(email, password, options = {}) {
+export async function signIn(email, password) {
   if (!db) {
     return { error: new Error('Supabase is not configured.') };
   }
@@ -357,13 +396,25 @@ export async function signIn(email, password, options = {}) {
     return { error: new Error('Authentication temporarily locked.') };
   }
 
-  const result = await db.auth.signInWithPassword({ 
-    email, 
-    password,
-    options: {
-      persistSession: options.persistSession !== undefined ? options.persistSession : true
-    }
-  });
+  let result;
+  try {
+    // session scope controlled at client level via sessionStorage
+    result = await Promise.race([
+      db.auth.signInWithPassword({
+        email,
+        password
+      }),
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Sign in timed out. Check your internet connection and try again.'));
+        }, 12000);
+      })
+    ]);
+  } catch (error) {
+    logSecurityEvent({ type: 'LOGIN_FAILED', details: { reason: error?.message || 'Sign in threw unexpectedly' } });
+    recordFailedAuthAttempt();
+    return { error };
+  }
 
   if (result.error) {
     logSecurityEvent({ type: 'LOGIN_FAILED', details: { reason: result.error.message } });
@@ -395,19 +446,54 @@ export async function signUp(email, password) {
 }
 
 export async function signOut(scope = 'local') {
+  let remoteSignOutFailed = false;
+
   try {
     if (db) {
       await db.auth.signOut({ scope });
     }
   } catch (error) {
+    remoteSignOutFailed = true;
     console.error('Sign out error:', error);
-  } finally {
-    currentUser = null;
-    if (idleTimer) clearTimeout(idleTimer);
-    
-    // Hard reset to clear all state and history
-    window.location.href = '/';
   }
+
+  clearLocalSession();
+
+  if (remoteSignOutFailed) {
+    showToast('Sign out may be incomplete — please close your browser', 'warning');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 2000);
+    return;
+  }
+
+  window.location.href = '/';
+}
+
+export function clearLocalSession() {
+  const keys = getSessionStorageKeys();
+
+  if (keys.legacyKey) {
+    sessionStorage.removeItem(keys.legacyKey);
+  }
+
+  if (keys.sdkKey) {
+    sessionStorage.removeItem(keys.sdkKey);
+    sessionStorage.removeItem(`${keys.sdkKey}-code-verifier`);
+    sessionStorage.removeItem(`${keys.sdkKey}-user`);
+  }
+
+  currentUser = null;
+  isLocked = false;
+  lockAttempts = 0;
+  lastActivityTime = 0;
+
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+
+  clearSessionCheckInterval();
 }
 
 export async function resetPassword(email) {
