@@ -9,6 +9,7 @@ import { BudgetService } from '../services/budget.service.js';
 import { AnalyticsService } from '../services/analytics.service.js';
 import { CATEGORIES } from '../data/seed.js';
 import { drawCashflowChart, drawDonutChart, formatCurrency, formatPct } from '../components/charts.js';
+import { sensitiveValueHtml } from '../security/privacy.js';
 
 /**
  * Render dashboard view
@@ -40,15 +41,15 @@ export function renderDashboard() {
     <div class="grid grid-4" style="margin-bottom: 32px;">
       <div class="stat-card">
         <div class="stat-label">Net Worth</div>
-        <div class="stat-value" style="color: var(--accent-gold);">${formatCurrency(netWorth)}</div>
+        <div class="stat-value" style="color: var(--accent-gold);">${sensitiveValueHtml(formatCurrency(netWorth), { width: '12ch', copyValue: String(netWorth), copyLabel: 'Net worth' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Income This Month</div>
-        <div class="stat-value" style="color: var(--accent-green);">${formatCurrency(curCr)}</div>
+        <div class="stat-value" style="color: var(--accent-green);">${sensitiveValueHtml(formatCurrency(curCr), { width: '12ch', copyValue: String(curCr), copyLabel: 'Income' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Expenses This Month</div>
-        <div class="stat-value" style="color: var(--accent-red);">${formatCurrency(curDr)}</div>
+        <div class="stat-value" style="color: var(--accent-red);">${sensitiveValueHtml(formatCurrency(curDr), { width: '12ch', copyValue: String(curDr), copyLabel: 'Expense' })}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Savings Rate</div>
@@ -135,7 +136,7 @@ function renderRecentTransactions() {
         <div class="tx-category">${cat.emoji}</div>
         <div class="tx-title">${tx.title}</div>
         <div class="tx-account">${fs?.name || '[Deleted]'}</div>
-        <div class="tx-amount ${tx.type.toLowerCase()}">${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}</div>
+        <div class="tx-amount ${tx.type.toLowerCase()}">${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}`, { width: '10ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}</div>
         <div class="tx-delete" onclick="window.deleteTransaction('${tx.id}')">🗑️</div>
       </div>
     `;
@@ -169,8 +170,8 @@ function renderBudgetHealth() {
           <div class="progress-fill ${fillClass}" style="width: ${Math.min(b.utilization, 100)}%"></div>
         </div>
         <div class="budget-status">
-          <span class="budget-spent">${formatCurrency(b.spent)} spent</span>
-          <span>${formatCurrency(b.limit)} limit</span>
+          <span class="budget-spent">${sensitiveValueHtml(formatCurrency(b.spent), { width: '10ch', copyValue: String(b.spent), copyLabel: 'Budget spent' })} spent</span>
+          <span>${sensitiveValueHtml(formatCurrency(b.limit), { width: '10ch', copyValue: String(b.limit), copyLabel: 'Budget limit' })} limit</span>
         </div>
       </div>
     `;
