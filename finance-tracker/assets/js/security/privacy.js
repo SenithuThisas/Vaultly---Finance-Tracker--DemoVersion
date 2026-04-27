@@ -4,6 +4,7 @@
 
 import { dispatch, getState, subscribeUiState } from '../state.js';
 import { showToast } from '../components/toast.js';
+import { renderCopyButton } from '../components/copyButton.js';
 
 const CLIPBOARD_CLEAR_MS = 30000;
 let clipboardClearTimer = null;
@@ -39,6 +40,42 @@ function updatePrivacyTogglesUI(isPrivacyEnabled) {
 function applyPrivacyStateToDom(uiState) {
   document.body.classList.toggle('privacy-blur', uiState.isPrivacyBlurActive);
   updatePrivacyTogglesUI(uiState.privacyModeEnabled);
+  updateCopyButtons(uiState.isPrivacyBlurActive);
+}
+
+function updateCopyButtons(isBlurActive) {
+  const buttons = document.querySelectorAll('[data-copy-sensitive]');
+  buttons.forEach(button => {
+    const nextDisabled = Boolean(isBlurActive);
+    button.disabled = nextDisabled;
+    button.classList.toggle('disabled', nextDisabled);
+    if (nextDisabled) {
+      button.dataset.copyDisabled = 'true';
+    } else {
+      button.dataset.copyDisabled = 'false';
+    }
+  });
+}
+
+function showCopyTooltip(button, text) {
+  if (!button) return;
+  const icon = button.querySelector('.copy-icon');
+  if (icon && !icon.dataset.originalIcon) {
+    icon.dataset.originalIcon = icon.textContent || '';
+  }
+  const tooltip = button.querySelector('.copy-tooltip');
+  if (!tooltip) return;
+  tooltip.textContent = text;
+  if (icon && text === 'Copied!') {
+    icon.textContent = '✓';
+  }
+  button.classList.add('show-tooltip');
+  setTimeout(() => {
+    button.classList.remove('show-tooltip');
+    if (icon && icon.dataset.originalIcon) {
+      icon.textContent = icon.dataset.originalIcon;
+    }
+  }, 2000);
 }
 
 export function initPrivacyControls() {
@@ -56,9 +93,16 @@ export function initPrivacyControls() {
     if (copyBtn) {
       event.preventDefault();
       event.stopPropagation();
+
+      const isDisabled = copyBtn.dataset.copyDisabled === 'true' || copyBtn.disabled;
+      if (isDisabled) {
+        showCopyTooltip(copyBtn, 'Reveal values to copy');
+        return;
+      }
+
       const value = copyBtn.getAttribute('data-copy-value') || '';
       const label = copyBtn.getAttribute('data-copy-label') || 'Value';
-      copySensitiveValue(value, label);
+      copySensitiveValue(value, label, copyBtn);
     }
   });
 
@@ -93,18 +137,21 @@ export function sensitiveValueHtml(text, options = {}) {
     copyLabel = 'Value'
   } = options;
 
+  const isBlurActive = getPrivacyState().isPrivacyBlurActive;
+
   const copyButton = copyValue
-    ? `<button class="sensitive-copy-btn" type="button" data-copy-sensitive="true" data-copy-label="${copyLabel}" data-copy-value="${copyValue}" aria-label="Copy ${copyLabel}" title="Copy ${copyLabel}">⧉</button>`
+    ? renderCopyButton({ value: copyValue, label: copyLabel, disabled: isBlurActive })
     : '';
 
   return `<span class="sensitive-wrap ${extraClass}"><span class="sensitive-value" style="--sensitive-min-width:${width};">${text}</span>${copyButton}</span>`;
 }
 
-export async function copySensitiveValue(value, label = 'Value') {
+export async function copySensitiveValue(value, label = 'Value', sourceButton = null) {
   if (!value) return;
 
   try {
     await navigator.clipboard.writeText(String(value));
+    showCopyTooltip(sourceButton, 'Copied!');
     showToast(`${label} copied. Clipboard clears in 30s.`, 'info', 2200);
   } catch {
     showToast('Clipboard unavailable in this browser context', 'warning', 2600);
