@@ -10,6 +10,7 @@ import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { CATEGORIES, FUND_SOURCE_TYPES, CURRENCIES } from '../data/seed.js';
 import { canSubmit, translateError } from '../security/index.js';
+import { AnalyticsService } from '../services/analytics.service.js';
 
 /**
  * Render banks/fund sources view
@@ -101,8 +102,7 @@ function getCurrentMonthFlow(fundSourceId) {
   return FundSourceService.getMonthlyFlow(fundSourceId, now.getFullYear(), now.getMonth());
 }
 
-// Import AnalyticsService for net worth calculation
-import { AnalyticsService } from '../services/analytics.service.js';
+// Import AnalyticsService for net worth calculation (moved to top)
 
 function setupEventListeners() {
   // Add account button
@@ -203,15 +203,17 @@ function showAddAccountModal() {
   // Reactive field visibility
   const typeSelect = document.getElementById('modal-account-type');
   const bankFields = document.getElementById('bank-specific-fields');
-  const updateVisibility = () => {
-    if (typeSelect.value === 'cash') {
-      bankFields.classList.add('hidden');
-    } else {
-      bankFields.classList.remove('hidden');
-    }
-  };
-  typeSelect.addEventListener('change', updateVisibility);
-  updateVisibility();
+  if (typeSelect && bankFields) {
+    const updateVisibility = () => {
+      if (typeSelect.value === 'cash') {
+        bankFields.classList.add('hidden');
+      } else {
+        bankFields.classList.remove('hidden');
+      }
+    };
+    typeSelect.addEventListener('change', updateVisibility);
+    updateVisibility();
+  }
 }
 
 function showEditAccountModal(id) {
@@ -299,15 +301,17 @@ function showEditAccountModal(id) {
   // Reactive field visibility
   const typeSelect = document.getElementById('edit-account-type');
   const bankFields = document.getElementById('edit-bank-specific-fields');
-  const updateVisibility = () => {
-    if (typeSelect.value === 'cash') {
-      bankFields.classList.add('hidden');
-    } else {
-      bankFields.classList.remove('hidden');
-    }
-  };
-  typeSelect.addEventListener('change', updateVisibility);
-  updateVisibility();
+  if (typeSelect && bankFields) {
+    const updateVisibility = () => {
+      if (typeSelect.value === 'cash') {
+        bankFields.classList.add('hidden');
+      } else {
+        bankFields.classList.remove('hidden');
+      }
+    };
+    typeSelect.addEventListener('change', updateVisibility);
+    updateVisibility();
+  }
 }
 
 function showDeleteConfirmation(id) {
@@ -330,13 +334,13 @@ function showDeleteConfirmation(id) {
 }
 
 // Global functions for color selection
-window.selectColorSwatch = function(el) {
+window.selectColorSwatch = function (el) {
   document.querySelectorAll('#modal-body .color-swatch').forEach(s => s.classList.remove('selected'));
   el.classList.add('selected');
   document.getElementById('modal-color').value = el.dataset.color;
 };
 
-window.selectEditColorSwatch = function(el) {
+window.selectEditColorSwatch = function (el) {
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
   el.classList.add('selected');
   document.getElementById('edit-color').value = el.dataset.color;
