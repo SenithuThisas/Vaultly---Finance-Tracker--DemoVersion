@@ -250,6 +250,7 @@ function updateBreadcrumb(viewName) {
       dashboard: 'Dashboard',
       banks: 'Bank Accounts',
       transactions: 'Transactions',
+      pending: 'Pending Entries',
       transfers: 'Transfers',
       budgets: 'Budgets',
       analytics: 'Analytics'
