@@ -39,9 +39,11 @@ import { renderDashboard } from './views/dashboard.view.js';
 import { renderBanks } from './views/banks.view.js';
 import { renderTransactions } from './views/transactions.view.js';
 import { showAddTransactionForm } from './views/transactions.view.js';
+import { renderPendingEntries } from './views/pendingEntries.view.js';
 import { renderTransfers } from './views/transfers.view.js';
 import { renderBudgets } from './views/budgets.view.js';
 import { renderAnalytics } from './views/analytics.view.js';
+import { renderTelegramSettings } from './views/telegramSettings.view.js';
 
 let appInitialized = false;
 let userCache = {};
@@ -50,6 +52,7 @@ const APP_VIEW_NAME_MAP = {
   dashboard: renderDashboard,
   banks: renderBanks,
   transactions: renderTransactions,
+  pending: renderPendingEntries,
   transfers: renderTransfers,
   budgets: renderBudgets,
   analytics: renderAnalytics
@@ -519,9 +522,10 @@ function registerKeyboardShortcuts() {
       '1': 'dashboard',
       '2': 'banks',
       '3': 'transactions',
-      '4': 'transfers',
-      '5': 'budgets',
-      '6': 'analytics'
+      '4': 'pending',
+      '5': 'transfers',
+      '6': 'budgets',
+      '7': 'analytics'
     };
 
     if (shortcuts[event.key]) {
@@ -759,6 +763,8 @@ function showSettingsModal() {
       </div>
     </div>
 
+    <div id="telegram-settings-panel"></div>
+
     <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;">
 
     <div class="form-group">
@@ -842,6 +848,8 @@ function showSettingsModal() {
       window.location.reload();
     }
   });
+
+  renderTelegramSettings();
 
   const newConfirm = confirm.cloneNode(true);
   confirm.parentNode.replaceChild(newConfirm, confirm);

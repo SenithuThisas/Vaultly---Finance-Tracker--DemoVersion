@@ -386,6 +386,68 @@
 .badge-trf { background: rgba(96, 165, 250, 0.15); color: var(--accent-blue); }
 
 /* ══════════════════════════════════════════════
+   PENDING ENTRIES
+   ══════════════════════════════════════════════ */
+.pending-list {
+  display: grid;
+  gap: 16px;
+}
+
+.pending-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pending-card-title {
+  font-weight: 600;
+  flex: 1;
+}
+
+.pending-card-amount {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.pending-card-meta {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pending-card-meta .meta-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10px;
+  margin-right: 6px;
+}
+
+.pending-edit {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+}
+
+.pending-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 768px) {
+  .pending-card-meta {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ══════════════════════════════════════════════
    TABLE
    ══════════════════════════════════════════════ */
 .table-container {

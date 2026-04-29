@@ -233,6 +233,14 @@
         </svg>
         <span class="nav-link-text">Transactions</span>
       </a>
+      <a class="nav-link" data-view="pending" data-tooltip="Pending Entries">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16v12H4z" />
+          <path d="M4 8h16" />
+          <path d="M8 20h8" />
+        </svg>
+        <span class="nav-link-text">Pending Entries</span>
+      </a>
       <a class="nav-link" data-view="transfers" data-tooltip="Transfers">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 3l4 4-4 4" />
@@ -304,6 +312,7 @@
       <section id="view-dashboard" class="view"></section>
       <section id="view-banks" class="view"></section>
       <section id="view-transactions" class="view"></section>
+      <section id="view-pending" class="view"></section>
       <section id="view-transfers" class="view"></section>
       <section id="view-budgets" class="view"></section>
       <section id="view-analytics" class="view"></section>
@@ -333,6 +342,14 @@
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
       Transactions
+    </button>
+    <button class="tab-item" data-view="pending">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 4h16v12H4z" />
+        <path d="M4 8h16" />
+        <path d="M8 20h8" />
+      </svg>
+      Pending
     </button>
     <button class="tab-item" data-view="budgets">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
