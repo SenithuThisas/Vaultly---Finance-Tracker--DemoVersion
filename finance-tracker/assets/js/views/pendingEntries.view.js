@@ -4,7 +4,7 @@
 
 import { db, isConfigured } from '../config/supabase.js';
 import { registerViewRenderer } from '../state.js';
-import { formatCurrency } from '../components/charts.js';
+import { formatCurrency } from '../utils/formatters.js';
 import { showToast } from '../components/toast.js';
 import { setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 
