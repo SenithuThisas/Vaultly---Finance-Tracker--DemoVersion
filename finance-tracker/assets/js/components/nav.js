@@ -5,6 +5,7 @@
 import { navigateTo } from '../state.js';
 import { RecurringService } from '../services/recurring.service.js';
 import { BudgetService } from '../services/budget.service.js';
+import { db, isConfigured } from '../config/supabase.js';
 
 /**
  * Initialize navigation event listeners
@@ -173,20 +174,28 @@ export function setActiveView(viewName) {
 }
 
 /**
- * Update notification badges on nav items
+ * Update notification badges on nav items (synchronous — recurring & budgets)
  */
 export function updateBadges() {
-  // Check recurring due
+  // Check recurring due — only show if user hasn't visited Transactions this session
+  const txLastVisited = Number(localStorage.getItem('nav_visited_transactions') || 0);
+  const sessionStart = Number(sessionStorage.getItem('vaultly.session_start') || 0);
+  const txBadgeActive = txLastVisited < sessionStart;
+
   const dueCount = RecurringService.checkDue();
 
   // Check over-budget count
   const budgetStatuses = BudgetService.getStatus();
-  const overBudgetCount = budgetStatuses.filter(b => b.utilization > 90).length;
+  const budgetLastVisited = Number(localStorage.getItem('nav_visited_budgets') || 0);
+  const budgetBadgeActive = budgetLastVisited < sessionStart;
+  const overBudgetCount = budgetBadgeActive
+    ? budgetStatuses.filter(b => b.utilization > 90).length
+    : 0;
 
-  // Update badges in nav
-  document.querySelectorAll('.nav-badge').forEach(badge => badge.remove());
+  // Remove all existing static badges (pending badge managed separately)
+  document.querySelectorAll('.nav-badge:not(.nav-badge-pending)').forEach(badge => badge.remove());
 
-  if (dueCount > 0) {
+  if (dueCount > 0 && txBadgeActive) {
     const txNavLink = document.querySelector('.nav-link[data-view="transactions"]');
     if (txNavLink) {
       const badge = document.createElement('span');
@@ -204,5 +213,77 @@ export function updateBadges() {
       badge.textContent = overBudgetCount;
       budgetNavLink.appendChild(badge);
     }
+  }
+
+  // Kick off async pending badge update without blocking
+  updatePendingBadge();
+}
+
+/**
+ * Async — queries Supabase for the live pending entry count and renders
+ * a single badge on the Pending Entries nav link and mobile tab bar item.
+ * Idempotent: safe to call multiple times; always removes stale badges first.
+ */
+export async function updatePendingBadge() {
+  // Always clear all existing pending badges first (sidebar + tab bar)
+  document.querySelectorAll('.nav-badge-pending').forEach(b => b.remove());
+
+  if (!isConfigured() || !db) return;
+
+  try {
+    const { data: sessionData } = await db.auth.getSession();
+    const userId = sessionData?.session?.user?.id || null;
+    if (!userId) return;
+
+    // Check "last visited" timestamp — only show badge for entries NEWER than last visit
+    const lastVisited = Number(localStorage.getItem('nav_visited_pending') || 0);
+
+    const { count, error } = await db
+      .from('pending_transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .eq('user_id', userId)
+      .gt('created_at', new Date(lastVisited).toISOString());
+
+    if (error || !count) return;
+
+    const label = count > 99 ? '99+' : String(count);
+
+    // Sidebar nav link — one badge only
+    const pendingNavLink = document.querySelector('.nav-link[data-view="pending"]');
+    if (pendingNavLink) {
+      // Guard: remove any stale badge that snuck in (race condition safety)
+      pendingNavLink.querySelectorAll('.nav-badge-pending').forEach(b => b.remove());
+      const badge = document.createElement('span');
+      badge.className = 'nav-badge nav-badge-pending';
+      badge.textContent = label;
+      pendingNavLink.appendChild(badge);
+    }
+
+    // Bottom tab bar — one badge only
+    const pendingTab = document.querySelector('.tab-item[data-view="pending"]');
+    if (pendingTab) {
+      pendingTab.querySelectorAll('.nav-badge-pending').forEach(b => b.remove());
+      const tabBadge = document.createElement('span');
+      tabBadge.className = 'nav-badge nav-badge-pending';
+      tabBadge.textContent = label;
+      pendingTab.appendChild(tabBadge);
+    }
+  } catch {
+    // Non-critical — silently ignore badge update failures
+  }
+}
+
+/**
+ * Mark a section as visited. Call this when a view is entered.
+ * @param {'pending'|'transactions'|'budgets'} section
+ */
+export function markNavVisited(section) {
+  localStorage.setItem(`nav_visited_${section}`, String(Date.now()));
+  // Immediately re-evaluate badges to clear the count
+  if (section === 'pending') {
+    updatePendingBadge();
+  } else {
+    updateBadges();
   }
 }

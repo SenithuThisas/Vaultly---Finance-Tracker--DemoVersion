@@ -137,9 +137,13 @@
    ══════════════════════════════════════════════ */
 .analytics-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: var(--grid-gap);
   margin-bottom: var(--section-gap);
+}
+
+@media (min-width: 768px) {
+  .analytics-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .analytics-chart { height: clamp(160px, 30vw, 200px); }

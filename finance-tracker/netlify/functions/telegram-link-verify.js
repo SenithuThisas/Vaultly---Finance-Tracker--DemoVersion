@@ -84,27 +84,18 @@ export async function handler(event) {
     return jsonResponse(400, { error: 'Token expired' });
   }
 
-  const { data: existingMap } = await supabase
+  // UPSERT: handles both first-time linking and re-linking.
+  // If this telegram_user_id is already mapped (even to another user), we
+  // overwrite it — the OTP flow already validated ownership via the code.
+  const { error: upsertError } = await supabase
     .from('telegram_user_map')
-    .select('user_id')
-    .eq('telegram_user_id', tokenRow.telegram_user_id)
-    .maybeSingle();
+    .upsert(
+      { telegram_user_id: tokenRow.telegram_user_id, user_id: userId, created_at: new Date().toISOString() },
+      { onConflict: 'telegram_user_id' }
+    );
 
-  if (existingMap?.user_id && existingMap.user_id !== userId) {
-    return jsonResponse(409, { error: 'Telegram account already linked' });
-  }
-
-  if (!existingMap?.user_id) {
-    const { error: insertError } = await supabase
-      .from('telegram_user_map')
-      .insert({
-        user_id: userId,
-        telegram_user_id: tokenRow.telegram_user_id
-      });
-
-    if (insertError) {
-      return jsonResponse(500, { error: 'Failed to link account' });
-    }
+  if (upsertError) {
+    return jsonResponse(500, { error: 'Failed to link account' });
   }
 
   await supabase

@@ -305,3 +305,6 @@
 
 .sidebar:not(.open),
 .drawer:not(.open) { will-change: auto; }
+
+/* ── Pending tab: always relative for badge positioning ── */
+.tab-item[data-view="pending"] { position: relative; }

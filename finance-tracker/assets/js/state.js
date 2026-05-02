@@ -225,6 +225,17 @@ export function navigateTo(viewName) {
   updateActiveView(viewName);
   updateActiveNav(viewName);
   updateBreadcrumb(viewName);
+
+  // Mark this section as visited so its nav badge clears.
+  // Dynamic import avoids the circular dependency: state ← nav ← state.
+  import('./components/nav.js').then(({ markNavVisited }) => {
+    const BADGE_SECTIONS = ['pending', 'transactions', 'budgets'];
+    if (BADGE_SECTIONS.includes(viewName)) {
+      markNavVisited(viewName);
+    }
+  }).catch(() => {
+    // Non-critical — ignore if nav module isn't loaded yet
+  });
 }
 
 function updateActiveView(viewName) {

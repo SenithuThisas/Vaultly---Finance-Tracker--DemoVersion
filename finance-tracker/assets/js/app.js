@@ -915,6 +915,11 @@ function handleDatabaseError(error) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Record session start so badge "last visited" timestamps can compare against it
+  if (!sessionStorage.getItem('vaultly.session_start')) {
+    sessionStorage.setItem('vaultly.session_start', String(Date.now()));
+  }
+
   initGlobalErrorHandlers({ handleAuthError, handleNetworkError, handleDatabaseError });
   hydratePendingQueueMeta();
   initOfflineHandlers();

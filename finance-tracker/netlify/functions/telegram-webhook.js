@@ -5,7 +5,9 @@ const TELEGRAM_SECRET_TOKEN = process.env.TELEGRAM_SECRET_TOKEN || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const MESSAGE_REGEX = /^\s*(dr|cr)\s*-\s*([^-]+?)\s*-\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:-\s*(.+))?\s*$/i;
+// Split on " - " (space-dash-space) so hyphenated category names
+// like "Co-working" are preserved correctly.
+const PART_SEPARATOR = / - /;
 
 function getSupabaseClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -23,18 +25,24 @@ function formatCurrency(amount) {
 }
 
 function parseMessage(text) {
-  const match = text.match(MESSAGE_REGEX);
-  if (!match) return null;
+  // Split on " - " only — preserves dashes within field values
+  const parts = text.trim().split(PART_SEPARATOR);
+  if (parts.length < 3) return null;
 
-  const type = match[1].toUpperCase();
-  const category = match[2].trim();
-  const amountRaw = match[3].replace(/,/g, '');
+  const typeRaw = parts[0].trim().toUpperCase();
+  if (!['DR', 'CR'].includes(typeRaw)) return null;
+
+  const category = parts[1].trim();
+  if (!category) return null;
+
+  const amountRaw = parts[2].trim().replace(/,/g, '');
   const amount = Number(amountRaw);
-  const note = (match[4] || '').trim();
-
   if (!Number.isFinite(amount) || amount <= 0) return null;
 
-  return { type, category, amount, note };
+  // Everything from part[3] onwards is the optional note
+  const note = parts.slice(3).join(' - ').trim();
+
+  return { type: typeRaw, category, amount, note };
 }
 
 async function sendTelegramMessage(chatId, text, replyToMessageId = null) {
@@ -135,7 +143,7 @@ export async function handler(event) {
 
   const parsed = parseMessage(text);
   if (!parsed) {
-    const hint = 'Format: DR-Food-500 or CR-Salary-5000 (optional note: DR-Food-500-Lunch)';
+    const hint = 'Format: DR - Food - 500 or CR - Salary - 5,000 - Monthly pay\n(Use spaces around dashes. Notes are optional.)';
     await sendTelegramMessage(chatId, `I could not parse that. ${hint}`, telegramMessageId);
     return { statusCode: 200, body: 'Parse failed' };
   }
@@ -187,7 +195,7 @@ export async function handler(event) {
     return { statusCode: 200, body: 'Insert failed' };
   }
 
-  const confirmation = `✅ ${parsed.type} · ${parsed.category} · ${formatCurrency(parsed.amount)} — saved for review`;
+  const confirmation = `✅ ${parsed.type} · ${parsed.category} · ${formatCurrency(parsed.amount)} saved for review.\n\nOpen Vaultly > Pending Entries to assign an account and approve.`;
   await sendTelegramMessage(chatId, confirmation, telegramMessageId);
 
   return { statusCode: 200, body: 'OK' };
