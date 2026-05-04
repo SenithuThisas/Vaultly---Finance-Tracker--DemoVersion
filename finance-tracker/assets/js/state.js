@@ -117,6 +117,7 @@ export function clearAppState() {
   AppState.transactions = [];
   AppState.transfers = [];
   AppState.budgets = [];
+  AppState.goals = [];
   AppState.recurringRules = [];
   AppState.filters = {};
   AppState.currentView = 'dashboard';
@@ -166,6 +167,10 @@ export function dispatch(action, payload) {
     case 'ADD_TRANSFER':
       AppState.transfers.unshift(payload);
       break;
+    case 'EDIT_TRANSFER':
+      const trfIdx = AppState.transfers.findIndex(t => t.id === payload.id);
+      if (trfIdx !== -1) AppState.transfers[trfIdx] = payload;
+      break;
     case 'DELETE_TRANSFER':
       AppState.transfers = AppState.transfers.filter(t => t.id !== payload);
       break;
@@ -178,6 +183,16 @@ export function dispatch(action, payload) {
       break;
     case 'DELETE_BUDGET':
       AppState.budgets = AppState.budgets.filter(b => b.id !== payload);
+      break;
+    case 'ADD_GOAL':
+      AppState.goals.push(payload);
+      break;
+    case 'EDIT_GOAL':
+      const gIdx = AppState.goals.findIndex(g => g.id === payload.id);
+      if (gIdx !== -1) AppState.goals[gIdx] = payload;
+      break;
+    case 'DELETE_GOAL':
+      AppState.goals = AppState.goals.filter(g => g.id !== payload);
       break;
     case 'ADD_RECURRING_RULE':
       AppState.recurringRules.push(payload);
@@ -263,7 +278,7 @@ function updateBreadcrumb(viewName) {
       transactions: 'Transactions',
       pending: 'Pending Entries',
       transfers: 'Transfers',
-      budgets: 'Budgets',
+      budgets: 'Goals & Budgets',
       analytics: 'Analytics'
     };
     breadcrumb.textContent = names[viewName] || viewName;
