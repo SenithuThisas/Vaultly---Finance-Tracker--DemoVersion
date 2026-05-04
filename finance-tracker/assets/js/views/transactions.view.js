@@ -12,6 +12,7 @@ import { CATEGORIES, CR_CATEGORIES, DR_CATEGORIES, CURRENCIES } from '../data/se
 import { formatCurrency } from '../utils/formatters.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
+import { showAddTransferForm } from './transfers.view.js';
 
 const TRANSACTIONS_PAGE_SIZE = 50;
 let currentPage = 1;
@@ -40,8 +41,11 @@ export function renderTransactions() {
   }
 
   const html = `
-    <div class="view-header">
+    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center;">
       <h2 class="view-title">Transactions</h2>
+      <button class="btn btn-danger btn-sm" onclick="window.confirmDeleteAllTransactions()">
+        <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Delete All
+      </button>
     </div>
 
     <div class="filter-bar">
@@ -235,6 +239,10 @@ export function showAddTransactionForm() {
             <input type="radio" name="tx-type" value="CR">
             <span>💰 Credit (Money In)</span>
           </label>
+          <label class="radio-option" style="flex: 1; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 2px solid var(--border);">
+            <input type="radio" name="tx-type" value="TRF">
+            <span>🔄 Transfer</span>
+          </label>
         </div>
       </div>
 
@@ -307,7 +315,13 @@ export function showAddTransactionForm() {
 
   // Update category based on type selection
   const typeRadios = document.querySelectorAll('input[name="tx-type"]');
-  typeRadios.forEach(radio => radio.addEventListener('change', updateCategoryOptions));
+  typeRadios.forEach(radio => radio.addEventListener('change', (e) => {
+    if (e.target.value === 'TRF') {
+      showAddTransferForm();
+      return;
+    }
+    updateCategoryOptions();
+  }));
 
   updateCategoryOptions();
 
@@ -398,6 +412,27 @@ window.deleteTransaction = function(id) {
     renderTransactions();
     return true;
   });
+};
+
+window.confirmDeleteAllTransactions = async function() {
+  const state = getState();
+  if (state.transactions.length === 0) {
+    showToast('No transactions to delete', 'info');
+    return;
+  }
+  openModal('Delete All Transactions', 'Are you sure you want to permanently delete ALL transactions? This cannot be undone.', async () => {
+    try {
+      const { supabaseAdapter } = await import('../adapters/supabase.adapter.js');
+      showToast('Deleting all transactions...', 'info');
+      await supabaseAdapter.deleteAllTransactions();
+      showToast('All transactions deleted', 'success');
+      setTimeout(() => location.reload(), 1000);
+      return true;
+    } catch (e) {
+      showToast(translateError(e), 'error');
+      return false;
+    }
+  }, 'Delete All');
 };
 
 window.changeTxPage = function(page) {
