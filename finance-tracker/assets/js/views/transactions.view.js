@@ -12,6 +12,7 @@ import { CATEGORIES, CR_CATEGORIES, DR_CATEGORIES, CURRENCIES } from '../data/se
 import { formatCurrency } from '../utils/formatters.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
+import { showAddTransferForm } from './transfers.view.js';
 
 const TRANSACTIONS_PAGE_SIZE = 50;
 let currentPage = 1;
@@ -40,8 +41,11 @@ export function renderTransactions() {
   }
 
   const html = `
-    <div class="view-header">
+    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center;">
       <h2 class="view-title">Transactions</h2>
+      <button class="btn btn-danger btn-sm" onclick="window.confirmDeleteAllTransactions()">
+        <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Delete All
+      </button>
     </div>
 
     <div class="filter-bar">
@@ -190,8 +194,12 @@ function renderTransactionTable() {
         <td><span class="badge badge-${typeClass}">${cat.emoji} ${cat.label}</span></td>
         <td>${tx.title}</td>
         <td class="col-account">${fs?.name || '[Deleted]'}</td>
-        <td class="mono tx-amount ${typeClass}">${sensitiveValueHtml(`${tx.type === 'CR' ? '+' : '-'}${formatCurrency(tx.amount)}`, { width: '10ch', copyValue: String(tx.amount), copyLabel: 'Transaction amount' })}</td>
-        <td><span class="tx-delete" onclick="window.deleteTransaction('${tx.id}')">🗑️</span></td>
+        <td>
+          <div class="tx-actions">
+            <span class="tx-edit" onclick="window.editTransaction('${tx.id}')">✏️</span>
+            <span class="tx-delete" onclick="window.deleteTransaction('${tx.id}')">🗑️</span>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
@@ -207,10 +215,17 @@ function renderTransactionTable() {
 
 /**
  * Show add transaction form
+ * @param {string} [editTxId]
  */
-export function showAddTransactionForm() {
+export function showAddTransactionForm(editTxId = null) {
   const state = getState();
   const activeFundSources = state.fundSources.filter(fs => fs.isActive !== false);
+
+  let editTx = null;
+  if (editTxId) {
+    editTx = state.transactions.find(t => t.id === editTxId);
+    if (!editTx) return;
+  }
 
   if (activeFundSources.length === 0) {
     showToast('Please add a fund source first', 'error');
@@ -219,33 +234,37 @@ export function showAddTransactionForm() {
 
   const footerHTML = `
     <button class="btn btn-secondary" id="drawer-cancel">Cancel</button>
-    <button class="btn btn-primary" id="drawer-save">Record Transaction</button>
+    <button class="btn btn-primary" id="drawer-save" data-edit-id="${editTxId || ''}">${editTx ? 'Save Changes' : 'Record Transaction'}</button>
   `;
 
-  const { cancelBtn, saveBtn } = openDrawer('Add Transaction', `
+  const { cancelBtn, saveBtn } = openDrawer(editTx ? 'Edit Transaction' : 'Add Transaction', `
     <form id="tx-form">
       <div class="form-group">
         <label class="form-label">Transaction Type</label>
         <div class="radio-group" style="display: flex; gap: 16px;">
           <label class="radio-option" style="flex: 1; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 2px solid var(--border);">
-            <input type="radio" name="tx-type" value="DR" checked>
+            <input type="radio" name="tx-type" value="DR" ${(!editTx || editTx.type === 'DR') ? 'checked' : ''}>
             <span>💸 Debit (Money Out)</span>
           </label>
           <label class="radio-option" style="flex: 1; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 2px solid var(--border);">
-            <input type="radio" name="tx-type" value="CR">
+            <input type="radio" name="tx-type" value="CR" ${(editTx && editTx.type === 'CR') ? 'checked' : ''}>
             <span>💰 Credit (Money In)</span>
+          </label>
+          <label class="radio-option" style="flex: 1; padding: 12px; background: var(--bg-hover); border-radius: 8px; border: 2px solid var(--border);" ${editTx ? 'style="display:none;"' : ''}>
+            <input type="radio" name="tx-type" value="TRF">
+            <span>🔄 Transfer</span>
           </label>
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Title *</label>
-        <input type="text" class="form-input" id="tx-title" required placeholder="e.g. Grocery Shopping">
+        <input type="text" class="form-input" id="tx-title" required placeholder="e.g. Grocery Shopping" value="${editTx ? editTx.title : ''}">
       </div>
 
       <div class="form-group">
         <label class="form-label">Amount *</label>
-        <input type="number" class="form-input" id="tx-amount" required min="0.01" step="0.01" placeholder="0.00">
+        <input type="number" class="form-input" id="tx-amount" required min="0.01" step="0.01" placeholder="0.00" value="${editTx ? editTx.amount : ''}">
       </div>
 
       <div class="form-row">
@@ -255,45 +274,45 @@ export function showAddTransactionForm() {
         </div>
         <div class="form-group">
           <label class="form-label">Date *</label>
-          <input type="date" class="form-input" id="tx-date" required>
+          <input type="date" class="form-input" id="tx-date" required value="${editTx ? editTx.date : new Date().toISOString().split('T')[0]}">
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Fund Source *</label>
         <select class="form-input form-select" id="tx-fund-source" required>
-          ${activeFundSources.map(fs => `<option value="${fs.id}">${fs.icon || '🏦'} ${fs.name}</option>`).join('')}
+          ${activeFundSources.map(fs => `<option value="${fs.id}" ${editTx && editTx.fundSourceId === fs.id ? 'selected' : ''}>${fs.icon || '🏦'} ${fs.name}</option>`).join('')}
         </select>
       </div>
 
       <div class="form-group">
         <label class="form-label">Reference (optional)</label>
-        <input type="text" class="form-input" id="tx-reference" placeholder="e.g. CHEQUE-1234">
+        <input type="text" class="form-input" id="tx-reference" placeholder="e.g. CHEQUE-1234" value="${editTx?.reference || ''}">
       </div>
 
       <div class="form-group">
         <label class="form-label">Note (optional)</label>
-        <input type="text" class="form-input" id="tx-note" placeholder="Additional details...">
+        <input type="text" class="form-input" id="tx-note" placeholder="Additional details..." value="${editTx?.note || ''}">
       </div>
 
       <div class="form-group">
         <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="tx-recurring">
+          <input type="checkbox" id="tx-recurring" ${editTx?.isRecurring ? 'checked' : ''}>
           <span>Recurring Transaction</span>
         </label>
       </div>
 
-      <div id="recurring-options" style="display: none;">
+      <div id="recurring-options" style="display: ${editTx?.isRecurring ? 'block' : 'none'};">
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Frequency</label>
             <select class="form-input form-select" id="tx-recurring-period">
-              <option value="weekly">Weekly</option>
-              <option value="monthly" selected>Monthly</option>
-              <option value="yearly">Yearly</option>
+              <option value="weekly" ${editTx?.recurringPeriod === 'weekly' ? 'selected' : ''}>Weekly</option>
+              <option value="monthly" ${(!editTx || editTx.recurringPeriod === 'monthly') ? 'selected' : ''}>Monthly</option>
+              <option value="yearly" ${editTx?.recurringPeriod === 'yearly' ? 'selected' : ''}>Yearly</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="display:none;">
             <label class="form-label">Next Due Date</label>
             <input type="date" class="form-input" id="tx-next-due">
           </div>
@@ -302,14 +321,17 @@ export function showAddTransactionForm() {
     </form>
   `, footerHTML);
 
-  // Set default date
-  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
-
   // Update category based on type selection
   const typeRadios = document.querySelectorAll('input[name="tx-type"]');
-  typeRadios.forEach(radio => radio.addEventListener('change', updateCategoryOptions));
+  typeRadios.forEach(radio => radio.addEventListener('change', (e) => {
+    if (e.target.value === 'TRF') {
+      showAddTransferForm();
+      return;
+    }
+    updateCategoryOptions();
+  }));
 
-  updateCategoryOptions();
+  updateCategoryOptions(editTx?.category);
 
   // Recurring toggle
   const recurringCheckbox = document.getElementById('tx-recurring');
@@ -325,14 +347,14 @@ export function showAddTransactionForm() {
   if (saveBtn) saveBtn.addEventListener('click', saveTransaction);
 }
 
-function updateCategoryOptions() {
+function updateCategoryOptions(selectedCategory = null) {
   const type = document.querySelector('input[name="tx-type"]:checked')?.value || 'DR';
   const categorySelect = document.getElementById('tx-category');
   const categories = type === 'CR' ? CR_CATEGORIES : DR_CATEGORIES;
 
   if (categorySelect) {
     categorySelect.innerHTML = categories.map(c =>
-      `<option value="${c.id}">${c.emoji} ${c.label}</option>`
+      `<option value="${c.id}" ${selectedCategory === c.id ? 'selected' : ''}>${c.emoji} ${c.label}</option>`
     ).join('');
   }
 }
@@ -374,14 +396,22 @@ function saveTransaction() {
   }
 
   const saveBtn = document.getElementById('drawer-save');
+  const editId = saveBtn.getAttribute('data-edit-id');
   setButtonLoading(saveBtn, 'Saving...');
   try {
-    TransactionService.add({
-      title, amount, type, category, date, fundSourceId, reference, note, isRecurring, recurringPeriod
-    });
+    if (editId) {
+      TransactionService.edit(editId, {
+        title, amount, type, category, date, fundSourceId, reference, note, isRecurring, recurringPeriod
+      });
+      showToast(`Transaction updated successfully`, 'success');
+    } else {
+      TransactionService.add({
+        title, amount, type, category, date, fundSourceId, reference, note, isRecurring, recurringPeriod
+      });
+      showToast(`Transaction recorded: ${type === 'CR' ? '+' : '-'}${formatCurrency(parseFloat(amount))}`, 'success');
+    }
 
     closeDrawer();
-    showToast(`Transaction recorded: ${type === 'CR' ? '+' : '-'}${formatCurrency(parseFloat(amount))}`, 'success');
     renderTransactions();
   } catch (error) {
     showToast(translateError(error), 'error');
@@ -389,6 +419,11 @@ function saveTransaction() {
     setButtonReady(saveBtn);
   }
 }
+
+// Global function for editing
+window.editTransaction = function(id) {
+  showAddTransactionForm(id);
+};
 
 // Global function for deletion
 window.deleteTransaction = function(id) {
@@ -398,6 +433,27 @@ window.deleteTransaction = function(id) {
     renderTransactions();
     return true;
   });
+};
+
+window.confirmDeleteAllTransactions = async function() {
+  const state = getState();
+  if (state.transactions.length === 0) {
+    showToast('No transactions to delete', 'info');
+    return;
+  }
+  openModal('Delete All Transactions', 'Are you sure you want to permanently delete ALL transactions? This cannot be undone.', async () => {
+    try {
+      const { supabaseAdapter } = await import('../adapters/supabase.adapter.js');
+      showToast('Deleting all transactions...', 'info');
+      await supabaseAdapter.deleteAllTransactions();
+      showToast('All transactions deleted', 'success');
+      setTimeout(() => location.reload(), 1000);
+      return true;
+    } catch (e) {
+      showToast(translateError(e), 'error');
+      return false;
+    }
+  }, 'Delete All');
 };
 
 window.changeTxPage = function(page) {

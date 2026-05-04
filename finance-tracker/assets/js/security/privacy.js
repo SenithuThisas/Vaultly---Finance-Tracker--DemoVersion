@@ -4,7 +4,6 @@
 
 import { dispatch, getState, subscribeUiState } from '../state.js';
 import { showToast } from '../components/toast.js';
-import { renderCopyButton } from '../components/copyButton.js';
 
 const CLIPBOARD_CLEAR_MS = 30000;
 let clipboardClearTimer = null;
@@ -139,11 +138,17 @@ export function sensitiveValueHtml(text, options = {}) {
 
   const isBlurActive = getPrivacyState().isPrivacyBlurActive;
 
-  const copyButton = copyValue
-    ? renderCopyButton({ value: copyValue, label: copyLabel, disabled: isBlurActive })
-    : '';
+  if (copyValue) {
+    const disabledAttr = isBlurActive ? 'data-copy-disabled="true"' : 'data-copy-disabled="false"';
+    return `
+      <span class="sensitive-wrap ${extraClass}" data-copy-sensitive="true" data-copy-value="${copyValue}" data-copy-label="${copyLabel}" ${disabledAttr} style="cursor: pointer; position: relative;" title="Click to copy">
+        <span class="sensitive-value" style="--sensitive-min-width:${width};">${text}</span>
+        <span class="copy-tooltip"></span>
+      </span>
+    `.trim();
+  }
 
-  return `<span class="sensitive-wrap ${extraClass}"><span class="sensitive-value" style="--sensitive-min-width:${width};">${text}</span>${copyButton}</span>`;
+  return `<span class="sensitive-wrap ${extraClass}"><span class="sensitive-value" style="--sensitive-min-width:${width};">${text}</span></span>`;
 }
 
 export async function copySensitiveValue(value, label = 'Value', sourceButton = null) {

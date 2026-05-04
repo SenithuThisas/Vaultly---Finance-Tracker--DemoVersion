@@ -129,6 +129,7 @@ export function renderAnalytics() {
         ${recurringRules.length === 0 ? `
           <div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-text">No recurring rules</div></div>
         ` : `
+          <div class="table-container">
           <table class="table">
             <thead>
               <tr>
@@ -153,6 +154,7 @@ export function renderAnalytics() {
               }).join('')}
             </tbody>
           </table>
+          </div>
         `}
       </div>
 

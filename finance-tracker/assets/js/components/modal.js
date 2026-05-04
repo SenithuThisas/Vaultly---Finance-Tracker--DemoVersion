@@ -21,20 +21,28 @@ export function openModal(title, bodyHTML, onConfirm, confirmLabel = 'Confirm') 
   titleEl.textContent = title;
   bodyEl.innerHTML = bodyHTML;
   confirmBtn.textContent = confirmLabel;
+  confirmBtn.disabled = false;
 
-  // Style based on button type
-  if (confirmLabel === 'Delete' || confirmLabel === 'Archive') {
-    confirmBtn.style.background = '#F85149';
-  } else {
-    confirmBtn.style.background = '';
-  }
+  // Style confirm button based on action type
+  const isDanger = ['Delete', 'Archive', 'Delete All', 'Clear All'].includes(confirmLabel);
+  confirmBtn.style.background = isDanger ? '#F85149' : '';
 
-  currentConfirmCallback = () => {
-    const result = onConfirm();
-    if (result !== false) {
-      closeModal();
+  currentConfirmCallback = async () => {
+    const originalLabel = confirmBtn.textContent;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Working…';
+
+    try {
+      const result = await Promise.resolve(onConfirm());
+      if (result !== false) {
+        closeModal();
+      }
+      return result;
+    } finally {
+      // Re-enable in case modal wasn't closed (e.g. validation error returned false)
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = originalLabel;
     }
-    return result;
   };
 
   overlay.classList.add('open');

@@ -82,7 +82,12 @@ export function renderDashboard() {
     </div>
 
     <div class="card" style="margin-bottom: 32px;">
-      <h3 class="chart-title">Recent Transactions</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 class="chart-title" style="margin-bottom: 0;">Recent Transactions</h3>
+        <button class="btn btn-danger btn-sm" onclick="window.confirmDeleteAllTransactions()">
+          <span class="material-icons" style="font-size: 16px;">delete_sweep</span> Delete All
+        </button>
+      </div>
       <div class="tx-list" id="recent-tx-list"></div>
     </div>
 

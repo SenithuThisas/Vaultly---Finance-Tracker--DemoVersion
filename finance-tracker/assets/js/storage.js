@@ -68,6 +68,8 @@ export async function saveRecord(action, payload) {
         return supabaseAdapter.deleteTransaction(payload);
       case 'ADD_TRANSFER':
         return supabaseAdapter.insertTransfer(payload);
+      case 'EDIT_TRANSFER':
+        return supabaseAdapter.updateTransfer(payload);
       case 'DELETE_TRANSFER':
         return supabaseAdapter.deleteTransfer(payload);
       case 'ADD_BUDGET':
@@ -76,6 +78,12 @@ export async function saveRecord(action, payload) {
         return supabaseAdapter.updateBudget(payload);
       case 'DELETE_BUDGET':
         return supabaseAdapter.deleteBudget(payload);
+      case 'ADD_GOAL':
+        return supabaseAdapter.insertGoal(payload);
+      case 'EDIT_GOAL':
+        return supabaseAdapter.updateGoal(payload);
+      case 'DELETE_GOAL':
+        return supabaseAdapter.deleteGoal(payload);
       case 'ADD_RECURRING_RULE':
         return supabaseAdapter.insertRecurringRule(payload);
       case 'EDIT_RECURRING_RULE':

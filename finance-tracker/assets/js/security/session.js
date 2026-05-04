@@ -497,14 +497,40 @@ export async function signUp(email, password) {
     return { error: new Error('Authentication temporarily locked.') };
   }
 
-  const result = await db.auth.signUp({ email, password });
+  let result;
+  try {
+    result = await Promise.race([
+      db.auth.signUp({ email, password }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Sign up timed out. Check your connection and try again.')), 12000)
+      )
+    ]);
+  } catch (error) {
+    logSecurityEvent({ type: 'SIGNUP_FAILED', details: { reason: error?.message || 'signUp threw unexpectedly' } });
+    recordFailedAuthAttempt();
+    return { error };
+  }
+
   if (result.error) {
     logSecurityEvent({ type: 'SIGNUP_FAILED', details: { reason: result.error.message } });
     recordFailedAuthAttempt();
-  } else {
-    resetAuthAttempts();
-    logSecurityEvent({ type: 'SIGNUP_SUCCESS', details: { email } });
+    return result;
   }
+
+  // CRITICAL: When email confirmations are ENABLED, Supabase returns
+  // a fake user object for duplicate emails to prevent email enumeration.
+  // A fake user object has an empty `identities` array, whereas a real newly
+  // created user will have at least one identity.
+  const isFakeUser = result.data?.user && result.data.user.identities && result.data.user.identities.length === 0;
+
+  if (!result.data?.user || isFakeUser) {
+    const duplicateError = new Error('User already registered');
+    logSecurityEvent({ type: 'SIGNUP_DUPLICATE', details: { email } });
+    return { error: duplicateError, data: result.data };
+  }
+
+  resetAuthAttempts();
+  logSecurityEvent({ type: 'SIGNUP_SUCCESS', details: { email } });
   return result;
 }
 

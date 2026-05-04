@@ -43,6 +43,34 @@ export const TransferService = {
   },
 
   /**
+   * Edit an existing transfer
+   * @param {string} id
+   * @param {Object} updates
+   * @returns {Object|null}
+   */
+  edit(id, updates) {
+    const state = getState();
+    const trf = state.transfers.find(t => t.id === id);
+    if (!trf) return null;
+
+    const clean = sanitizeFormData({ ...updates });
+    if (clean.amount !== undefined) clean.amount = parseFloat(clean.amount) || 0;
+    if (clean.fee !== undefined) clean.fee = parseFloat(clean.fee) || 0;
+
+    const updatedTrf = { ...trf, ...clean };
+    
+    if (!updatedTrf.fromFundSourceId || !updatedTrf.toFundSourceId || updatedTrf.fromFundSourceId === updatedTrf.toFundSourceId) {
+      throw new Error('Invalid transfer accounts');
+    }
+    if (!Number.isFinite(updatedTrf.amount) || updatedTrf.amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
+
+    dispatch('EDIT_TRANSFER', updatedTrf);
+    return updatedTrf;
+  },
+
+  /**
    * Delete a transfer
    * @param {string} id
    * @returns {boolean}
