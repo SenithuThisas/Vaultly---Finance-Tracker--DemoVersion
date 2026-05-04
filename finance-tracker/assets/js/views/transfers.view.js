@@ -78,8 +78,12 @@ export function renderTransfers() {
                     <td><span class="badge badge-trf">${toFs?.name || '[Deleted]'}</span></td>
                     <td class="mono" style="color: var(--accent-blue);">${sensitiveValueHtml(formatCurrency(t.amount), { width: '10ch', copyValue: String(t.amount), copyLabel: 'Transfer amount' })}</td>
                     <td class="mono">${t.fee > 0 ? sensitiveValueHtml(formatCurrency(t.fee), { width: '8ch', copyValue: String(t.fee), copyLabel: 'Transfer fee' }) : '-'}</td>
-                    <td>${t.note || '-'}</td>
-                    <td><span class="tx-delete" onclick="window.deleteTransfer('${t.id}')">🗑️</span></td>
+                    <td>
+                      <div class="tx-actions">
+                        <span class="tx-edit" onclick="window.editTransfer('${t.id}')">✏️</span>
+                        <span class="tx-delete" onclick="window.deleteTransfer('${t.id}')">🗑️</span>
+                      </div>
+                    </td>
                   </tr>
                 `;
               }).join('')}
@@ -101,17 +105,35 @@ export function renderTransfers() {
 
 /**
  * Show add transfer form
+ * @param {string} [editTrfId]
  */
-export function showAddTransferForm() {
+export function showAddTransferForm(editTrfId = null) {
   const state = getState();
   const activeFundSources = state.fundSources.filter(fs => fs.isActive !== false);
 
+  let editTrf = null;
+  if (editTrfId) {
+    editTrf = state.transfers.find(t => t.id === editTrfId);
+    if (!editTrf) return;
+  }
+
+  if (activeFundSources.length < 2) {
+    import('../components/toast.js').then(({ showToast }) => {
+      showToast('You need at least 2 accounts to make a transfer', 'warning');
+    });
+    // Fallback to transaction form if it was switched from there
+    import('./transactions.view.js').then(({ showAddTransactionForm }) => {
+      showAddTransactionForm();
+    });
+    return;
+  }
+
   const footerHTML = `
     <button class="btn btn-secondary" id="drawer-cancel">Cancel</button>
-    <button class="btn btn-primary" id="drawer-save">Transfer</button>
+    <button class="btn btn-primary" id="drawer-save" data-edit-id="${editTrfId || ''}">${editTrf ? 'Save Changes' : 'Transfer'}</button>
   `;
 
-  const { cancelBtn, saveBtn } = openDrawer('New Transfer', `
+  const { cancelBtn, saveBtn } = openDrawer(editTrf ? 'Edit Transfer' : 'New Transfer', `
     <form id="transfer-form">
       <div class="form-group">
         <label class="form-label">From Account *</label>
@@ -119,7 +141,7 @@ export function showAddTransferForm() {
           <option value="">Select source account</option>
           ${activeFundSources.map(fs => {
             const balance = FundSourceService.getBalance(fs.id);
-            return `<option value="${fs.id}">${fs.icon || '🏦'} ${fs.name} (${formatCurrency(balance)})</option>`;
+            return `<option value="${fs.id}" ${editTrf && editTrf.fromFundSourceId === fs.id ? 'selected' : ''}>${fs.icon || '🏦'} ${fs.name} (${formatCurrency(balance)})</option>`;
           }).join('')}
         </select>
       </div>
@@ -130,29 +152,29 @@ export function showAddTransferForm() {
           <option value="">Select destination account</option>
           ${activeFundSources.map(fs => {
             const balance = FundSourceService.getBalance(fs.id);
-            return `<option value="${fs.id}">${fs.icon || '🏦'} ${fs.name} (${formatCurrency(balance)})</option>`;
+            return `<option value="${fs.id}" ${editTrf && editTrf.toFundSourceId === fs.id ? 'selected' : ''}>${fs.icon || '🏦'} ${fs.name} (${formatCurrency(balance)})</option>`;
           }).join('')}
         </select>
       </div>
 
       <div class="form-group">
         <label class="form-label">Amount *</label>
-        <input type="number" class="form-input" id="transfer-amount" required min="0.01" step="0.01" placeholder="0.00">
+        <input type="number" class="form-input" id="transfer-amount" required min="0.01" step="0.01" placeholder="0.00" value="${editTrf ? editTrf.amount : ''}">
       </div>
 
       <div class="form-group">
         <label class="form-label">Transfer Fee</label>
-        <input type="number" class="form-input" id="transfer-fee" min="0" step="0.01" value="0" placeholder="0.00">
+        <input type="number" class="form-input" id="transfer-fee" min="0" step="0.01" value="${editTrf?.fee || '0'}" placeholder="0.00">
       </div>
 
       <div class="form-group">
         <label class="form-label">Date *</label>
-        <input type="date" class="form-input" id="transfer-date" required>
+        <input type="date" class="form-input" id="transfer-date" required value="${editTrf ? editTrf.date : new Date().toISOString().split('T')[0]}">
       </div>
 
       <div class="form-group">
         <label class="form-label">Note (optional)</label>
-        <input type="text" class="form-input" id="transfer-note" placeholder="e.g. Monthly savings transfer">
+        <input type="text" class="form-input" id="transfer-note" placeholder="e.g. Monthly savings transfer" value="${editTrf?.note || ''}">
       </div>
 
       <div id="transfer-preview" class="card" style="background: var(--bg-hover); margin-top: 16px;">
@@ -161,9 +183,6 @@ export function showAddTransferForm() {
       </div>
     </form>
   `, footerHTML);
-
-  // Set default date
-  document.getElementById('transfer-date').value = new Date().toISOString().split('T')[0];
 
   // Balance preview on change
   const amountInput = document.getElementById('transfer-amount');
@@ -245,19 +264,32 @@ function saveTransfer() {
   }
 
   const saveBtn = document.getElementById('drawer-save');
+  const editId = saveBtn.getAttribute('data-edit-id');
   setButtonLoading(saveBtn, 'Transferring...');
   try {
-    TransferService.add({
-      fromFundSourceId,
-      toFundSourceId,
-      amount,
-      fee: fee || 0,
-      date,
-      note
-    });
+    if (editId) {
+      TransferService.edit(editId, {
+        fromFundSourceId,
+        toFundSourceId,
+        amount,
+        fee: fee || 0,
+        date,
+        note
+      });
+      showToast(`Transfer updated successfully`, 'success');
+    } else {
+      TransferService.add({
+        fromFundSourceId,
+        toFundSourceId,
+        amount,
+        fee: fee || 0,
+        date,
+        note
+      });
+      showToast(`Transfer of ${formatCurrency(parseFloat(amount))} completed`, 'success');
+    }
 
     closeDrawer();
-    showToast(`Transfer of ${formatCurrency(parseFloat(amount))} completed`, 'success');
     renderTransfers();
   } catch (error) {
     showToast(translateError(error), 'error');
@@ -265,6 +297,11 @@ function saveTransfer() {
     setButtonReady(saveBtn);
   }
 }
+
+// Global function for editing
+window.editTransfer = function(id) {
+  showAddTransferForm(id);
+};
 
 // Global function for deletion
 window.deleteTransfer = function(id) {
