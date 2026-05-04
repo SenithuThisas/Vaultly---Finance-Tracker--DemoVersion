@@ -45,9 +45,14 @@ export async function renderPendingEntries() {
   }
 
   container.innerHTML = `
-    <div class="view-header">
-      <h2 class="view-title">Pending Entries</h2>
-      <div class="view-subtitle">Review transactions sent from your Telegram bot</div>
+    <div class="view-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h2 class="view-title">Pending Entries</h2>
+        <div class="view-subtitle">Review transactions sent from your Telegram bot</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="window.confirmClearAllPending()">
+        <span class="material-icons" style="font-size: 16px;">clear_all</span> Clear All
+      </button>
     </div>
     <div class="pending-list" id="pending-list"></div>
     <div class="empty-state" id="pending-empty" style="display:none;">
@@ -71,16 +76,18 @@ async function loadPendingEntries() {
   const { data: sessionData } = await db.auth.getSession();
   const userId = sessionData?.session?.user?.id || null;
 
-  const query = db
+  // Always require a user — never run an unscoped query
+  if (!userId) {
+    pendingEntries = [];
+    return;
+  }
+
+  const { data, error } = await db
     .from('pending_transactions')
     .select('*')
+    .eq('user_id', userId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
-
-  // Scope to current user if session is available (belt-and-suspenders alongside RLS)
-  if (userId) query.eq('user_id', userId);
-
-  const { data, error } = await query;
 
   if (error) {
     showToast(translateError(error), 'error');
@@ -90,6 +97,7 @@ async function loadPendingEntries() {
 
   pendingEntries = data || [];
 }
+
 
 function renderPendingList() {
   const list = document.getElementById('pending-list');
@@ -289,64 +297,28 @@ async function approveEntry(id, button) {
   }
 
   try {
-    // 1 — Insert the approved transaction
     const { data: sessionData } = await db.auth.getSession();
     const userId = sessionData?.session?.user?.id;
     if (!userId) throw new Error('Not authenticated');
 
     const txId = crypto.randomUUID();
-    const { error: txError } = await db.from('transactions').insert({
-      id: txId,
-      user_id: userId,
-      title: `Telegram · ${entry.category}`,
-      amount: Number(entry.amount),
-      type: entry.type,
-      category: entry.category,
-      fund_source_id: fundSourceId,
-      date: entry.date || new Date().toISOString().split('T')[0],
-      note: entry.note || null,
-      reference: null,
-      tags: [],
-      is_recurring: false,
-      recurring_period: null
-    });
 
-    if (txError) throw txError;
-
-    // 2 — Update fund source balance (increment/decrement)
-    const { fundSources } = getState();
-    const fs = fundSources.find(f => f.id === fundSourceId);
-    if (fs) {
-      const delta = entry.type === 'CR' ? Number(entry.amount) : -Number(entry.amount);
-      const newBalance = Number((fs.balance || 0) + delta).toFixed(2);
-      const { error: fsError } = await db
-        .from('fund_sources')
-        .update({ balance: newBalance })
-        .eq('id', fundSourceId)
-        .eq('user_id', userId);
-
-      if (fsError) {
-        // Non-fatal — balance will re-sync on next load
-        console.warn('Balance update failed:', fsError.message);
-      }
-    }
-
-    // 3 — Mark pending row as approved
+    // 1 — Mark pending row as approved
     const { error: statusError } = await db
       .from('pending_transactions')
       .update({ status: 'approved', fund_source_id: fundSourceId })
       .eq('id', id);
 
     if (statusError) {
-      // Non-fatal — transaction was already saved
-      console.warn('Status update failed:', statusError.message);
+      throw statusError;
     }
 
-    // 4 — Optimistic removal from pending list
+    // 2 — Optimistic removal from pending list
     pendingEntries = pendingEntries.filter(e => e.id !== id);
     renderPendingList();
 
-    // 5 — Sync in-memory state so Transactions view updates immediately
+    // 3 — Sync in-memory state and trigger DB insert via adapter
+    // The SQL trigger we added will automatically handle the balance update in the DB.
     dispatch('ADD_TRANSACTION', {
       id: txId,
       title: `Telegram · ${entry.category}`,
@@ -363,6 +335,9 @@ async function approveEntry(id, button) {
       createdAt: new Date().toISOString()
     });
 
+    // 4 — Update memory balance for the UI (since we don't have realtime on fund_sources)
+    const { fundSources } = getState();
+    const fs = fundSources.find(f => f.id === fundSourceId);
     if (fs) {
       const delta = entry.type === 'CR' ? Number(entry.amount) : -Number(entry.amount);
       dispatch('EDIT_FUND_SOURCE', { ...fs, balance: (fs.balance || 0) + delta });
@@ -422,6 +397,52 @@ async function rejectEntry(id, button) {
   showToast('Entry rejected.', 'info');
   updatePendingBadge();
 }
+
+window.confirmClearAllPending = async function() {
+  if (pendingEntries.length === 0) {
+    showToast('No pending entries to clear', 'info');
+    return;
+  }
+
+  showErrorModal({
+    title: 'Clear All Pending Entries?',
+    message: 'Are you sure you want to permanently delete all pending entries? This cannot be undone.',
+    actions: [
+      {
+        label: 'Yes, Clear All',
+        style: 'danger',
+        onClick: async () => {
+          try {
+            const { data: sessionData } = await db.auth.getSession();
+            const userId = sessionData?.session?.user?.id;
+            if (!userId) return;
+
+            showToast('Clearing entries...', 'info');
+            const { error } = await db
+              .from('pending_transactions')
+              .delete()
+              .eq('user_id', userId)
+              .eq('status', 'pending');
+
+            if (error) throw error;
+            
+            pendingEntries = [];
+            renderPendingList();
+            updatePendingBadge();
+            showToast('All pending entries cleared', 'success');
+          } catch (e) {
+            showToast(translateError(e), 'error');
+          }
+        }
+      },
+      {
+        label: 'Cancel',
+        style: 'ghost',
+        onClick: () => {}
+      }
+    ]
+  });
+};
 
 function setupRealtime() {
   if (!db) return;
