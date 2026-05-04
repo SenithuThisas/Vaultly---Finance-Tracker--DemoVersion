@@ -65,19 +65,26 @@ async function request(method, table, body = null, query = '') {
 export const supabaseAdapter = {
   async load() {
     try {
+      // Always scope every query to the current user — belt-and-suspenders
+      // alongside RLS so a misconfigured policy can never leak another user's data.
+      const user = getCurrentUser();
+      if (!user?.id) throw new Error('Cannot load data: no authenticated user');
+      const uid = user.id;
+      const uidFilter = `user_id=eq.${uid}`;
+
       const [fundSources, transactions, transfers, budgets, recurringRules] = await Promise.all([
-        request('GET', TABLES.fundSources, null, '?select=*&order=created_at'),
-        request('GET', TABLES.transactions, null, '?select=*&order=date.desc'),
-        request('GET', TABLES.transfers, null, '?select=*&order=date.desc'),
-        request('GET', TABLES.budgets, null, '?select=*&order=created_at'),
-        request('GET', TABLES.recurringRules, null, '?select=*&order=created_at'),
+        request('GET', TABLES.fundSources,    null, `?select=*&${uidFilter}&order=created_at`),
+        request('GET', TABLES.transactions,   null, `?select=*&${uidFilter}&order=date.desc`),
+        request('GET', TABLES.transfers,      null, `?select=*&${uidFilter}&order=date.desc`),
+        request('GET', TABLES.budgets,        null, `?select=*&${uidFilter}&order=created_at`),
+        request('GET', TABLES.recurringRules, null, `?select=*&${uidFilter}&order=created_at`),
       ]);
 
       return {
-        fundSources: (fundSources || []).map(normalizeFundSource),
-        transactions: (transactions || []).map(normalizeTransaction),
-        transfers: (transfers || []).map(normalizeTransfer),
-        budgets: (budgets || []).map(normalizeBudget),
+        fundSources:    (fundSources    || []).map(normalizeFundSource),
+        transactions:   (transactions   || []).map(normalizeTransaction),
+        transfers:      (transfers      || []).map(normalizeTransfer),
+        budgets:        (budgets        || []).map(normalizeBudget),
         recurringRules: (recurringRules || []).map(normalizeRecurringRule),
         settings: null
       };
@@ -97,7 +104,9 @@ export const supabaseAdapter = {
   },
 
   async deleteFundSource(id) {
-    return request('DELETE', TABLES.fundSources, null, `?id=eq.${id}`);
+    const user = getCurrentUser();
+    // Soft delete to preserve linked transactions history as promised by the UI
+    return request('PATCH', TABLES.fundSources, { is_active: false }, `?id=eq.${id}&user_id=eq.${user?.id}`);
   },
 
   // ── Transactions ──────────────────────────────────────────────────────────
@@ -110,7 +119,13 @@ export const supabaseAdapter = {
   },
 
   async deleteTransaction(id) {
-    return request('DELETE', TABLES.transactions, null, `?id=eq.${id}`);
+    const user = getCurrentUser();
+    return request('DELETE', TABLES.transactions, null, `?id=eq.${id}&user_id=eq.${user?.id}`);
+  },
+
+  async deleteAllTransactions() {
+    const user = getCurrentUser();
+    return request('DELETE', TABLES.transactions, null, `?user_id=eq.${user?.id}`);
   },
 
   // ── Fund Sources ──────────────────────────────────────────────────────────
@@ -128,7 +143,8 @@ export const supabaseAdapter = {
   },
 
   async deleteTransfer(id) {
-    return request('DELETE', TABLES.transfers, null, `?id=eq.${id}`);
+    const user = getCurrentUser();
+    return request('DELETE', TABLES.transfers, null, `?id=eq.${id}&user_id=eq.${user?.id}`);
   },
 
   // ── Budgets ───────────────────────────────────────────────────────────────
@@ -141,7 +157,8 @@ export const supabaseAdapter = {
   },
 
   async deleteBudget(id) {
-    return request('DELETE', TABLES.budgets, null, `?id=eq.${id}`);
+    const user = getCurrentUser();
+    return request('DELETE', TABLES.budgets, null, `?id=eq.${id}&user_id=eq.${user?.id}`);
   },
 
   // ── Recurring Rules ───────────────────────────────────────────────────────
