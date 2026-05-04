@@ -144,7 +144,7 @@
   z-index: 5;
 }
 
-.copy-btn.show-tooltip .copy-tooltip {
+.show-tooltip .copy-tooltip {
   opacity: 1;
   transform: translateY(0);
 }
@@ -879,13 +879,15 @@
 .color-swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 
 .color-swatch {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 6px;
   cursor: pointer;
   border: 2px solid transparent;
   transition: all var(--transition-fast);
-  min-width: 36px;
+  min-width: 40px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .color-swatch:hover { transform: scale(1.1); }
