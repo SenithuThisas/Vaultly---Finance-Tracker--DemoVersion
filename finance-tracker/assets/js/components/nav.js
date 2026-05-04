@@ -176,8 +176,20 @@ export function setActiveView(viewName) {
 /**
  * Update notification badges on nav items (synchronous — recurring & budgets)
  */
-export function updateBadges() {
-  // Check recurring due — only show if user hasn't visited Transactions this session
+export async function updateBadges() {
+  // Dynamically get state to avoid circular dependency
+  let currentView = 'dashboard';
+  try {
+    const stateModule = await import('../state.js');
+    currentView = stateModule.getState().currentView;
+  } catch (e) {
+    // Ignore if not loaded
+  }
+
+  // Check recurring due
+  if (currentView === 'transactions') {
+    localStorage.setItem('nav_visited_transactions', String(Date.now()));
+  }
   const txLastVisited = Number(localStorage.getItem('nav_visited_transactions') || 0);
   const sessionStart = Number(sessionStorage.getItem('vaultly.session_start') || 0);
   const txBadgeActive = txLastVisited < sessionStart;
@@ -185,6 +197,9 @@ export function updateBadges() {
   const dueCount = RecurringService.checkDue();
 
   // Check over-budget count
+  if (currentView === 'budgets') {
+    localStorage.setItem('nav_visited_budgets', String(Date.now()));
+  }
   const budgetStatuses = BudgetService.getStatus();
   const budgetLastVisited = Number(localStorage.getItem('nav_visited_budgets') || 0);
   const budgetBadgeActive = budgetLastVisited < sessionStart;
@@ -236,6 +251,11 @@ export async function updatePendingBadge() {
     if (!userId) return;
 
     // Check "last visited" timestamp — only show badge for entries NEWER than last visit
+    // If the user is currently on the pending view, update the timestamp now
+    const { getState } = await import('../state.js');
+    if (getState().currentView === 'pending') {
+      localStorage.setItem('nav_visited_pending', String(Date.now()));
+    }
     const lastVisited = Number(localStorage.getItem('nav_visited_pending') || 0);
 
     const { count, error } = await db
