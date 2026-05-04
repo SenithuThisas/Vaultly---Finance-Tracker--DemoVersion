@@ -188,13 +188,19 @@
 
 .auth-error-banner {
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.25);
   color: #f87171;
   padding: 0.75rem 1rem;
   border-radius: 12px;
   font-size: 0.875rem;
   margin-bottom: 1.5rem;
   text-align: center;
+  line-height: 1.5;
+}
+
+.auth-input.error {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .strength-meter {
