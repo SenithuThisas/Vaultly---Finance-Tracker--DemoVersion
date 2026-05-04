@@ -23,23 +23,50 @@ let pendingQueue = [];
 const PENDING_QUEUE_KEY = 'vaultly.pending.queue';
 
 export const ERROR_MESSAGES = {
-  'Invalid login credentials': 'Wrong email or password. Please try again.',
-  'Email not confirmed': 'Please check your email and click the confirmation link.',
-  'User already registered': 'An account with this email already exists. Try signing in.',
-  'Password should be at least 6 characters': 'Password must be at least 8 characters long.',
-  'Too many requests': 'Too many attempts. Please wait 60 seconds and try again.',
-  'Email rate limit exceeded': 'Too many emails sent. Please wait before requesting another.',
-  'Invalid email': 'Please enter a valid email address.',
+  // ── Signup errors ──────────────────────────────────────────────────────────
+  'User already registered': 'This email is already registered. Please sign in instead.',
+  'already registered': 'This email is already registered. Please sign in instead.',
+  'already been registered': 'This email is already registered. Please sign in instead.',
   'Signup requires a valid password': 'Please enter a valid password.',
+  'Password should be at least 6 characters': 'Password must be at least 8 characters long.',
+  'should be at least 6 characters': 'Password must be at least 8 characters long.',
+  'weak_password': 'Please choose a stronger password with letters, numbers, and symbols.',
+
+  // ── Login errors ───────────────────────────────────────────────────────────
+  'Invalid login credentials': 'Incorrect email or password. Please try again.',
+  'invalid_credentials': 'Incorrect email or password. Please try again.',
+  'Email not confirmed': 'Please verify your email first — check your inbox for a confirmation link.',
+  'email_not_confirmed': 'Please verify your email first — check your inbox for a confirmation link.',
+
+  // ── Email errors ───────────────────────────────────────────────────────────
+  'Invalid email': 'Please enter a valid email address.',
+  'invalid_email': 'Please enter a valid email address.',
+  'Email rate limit exceeded': 'Too many emails sent. Please wait a few minutes before trying again.',
+  'email rate limit': 'Too many emails sent. Please wait a few minutes before trying again.',
+
+  // ── Rate limiting ──────────────────────────────────────────────────────────
+  'Too many requests': 'Too many attempts. Please wait a minute and try again.',
+  'too many requests': 'Too many attempts. Please wait a minute and try again.',
+  'over_email_send_rate_limit': 'Email send limit reached. Please wait before requesting another.',
+
+  // ── Session errors ─────────────────────────────────────────────────────────
   'JWT expired': 'Your session has expired. Please sign in again.',
   'refresh_token_not_found': 'Session not found. Please sign in again.',
-  PGRST301: 'Authentication required. Please sign in.',
-  PGRST116: 'Record not found.',
+  'session_not_found': 'Your session has expired. Please sign in again.',
+
+  // ── Network & connection ───────────────────────────────────────────────────
+  'Failed to fetch': 'Connection error. Please check your internet and try again.',
+  'NetworkError': 'Network unavailable. Please check your connection.',
+  'timed out': 'The request timed out. Please check your connection and try again.',
+
+  // ── Database errors ────────────────────────────────────────────────────────
+  'PGRST301': 'Authentication required. Please sign in.',
+  'PGRST116': 'Record not found.',
   '23505': 'This record already exists.',
-  '23503': 'Cannot delete - this record is referenced elsewhere.',
+  '23503': 'Cannot delete — this record is referenced by other data.',
   '22P02': 'Invalid data format. Please check your inputs.',
-  'Failed to fetch': 'Connection error. Please check your internet connection.',
-  NetworkError: 'Network unavailable. Working in offline mode.',
+
+  // ── Fallback ───────────────────────────────────────────────────────────────
   default: 'Something went wrong. Please try again.'
 };
 
