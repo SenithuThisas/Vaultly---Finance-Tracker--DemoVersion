@@ -4,6 +4,7 @@
 
 import { getState, registerViewRenderer } from '../state.js';
 import { BudgetService } from '../services/budget.service.js';
+import { GoalService } from '../services/goal.service.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { CATEGORIES, DR_CATEGORIES } from '../data/seed.js';
@@ -21,12 +22,28 @@ export function renderBudgets() {
   const summary = BudgetService.getSummary();
   const statuses = BudgetService.getStatus();
   const unbudgeted = BudgetService.getUnbudgetedCategories();
+  const goals = GoalService.getAll();
 
   const html = `
-    <div class="view-header">
-      <h2 class="view-title">Budgets</h2>
-      <button class="btn btn-primary" id="add-budget-btn">+ Add Budget</button>
+    <div class="view-header" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+      <h2 class="view-title">Goals & Budgets</h2>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-secondary" id="add-goal-btn">+ Add Goal</button>
+        <button class="btn btn-primary" id="add-budget-btn">+ Add Budget</button>
+      </div>
     </div>
+
+    <h3 class="chart-title">Saving Goals</h3>
+    <div class="grid grid-3" id="goals-grid" style="margin-bottom: 32px;">
+      ${goals.length === 0 ? `
+        <div class="empty-state" style="grid-column: 1 / -1; padding: 24px;">
+          <div class="empty-icon">🎯</div>
+          <div class="empty-text">No saving goals created yet</div>
+        </div>
+      ` : ''}
+    </div>
+
+    <h3 class="chart-title">Expense Budgets</h3>
 
     <div class="grid grid-4" style="margin-bottom: 32px;">
       <div class="stat-card">
@@ -83,6 +100,7 @@ export function renderBudgets() {
 
   // Render budget cards
   setTimeout(() => {
+    renderGoalCards(goals);
     renderBudgetCards(statuses);
     setupEventListeners();
   }, 50);
@@ -122,24 +140,65 @@ function renderBudgetCards(statuses) {
   }).join('');
 }
 
-function setupEventListeners() {
-  const addBtn = document.getElementById('add-budget-btn');
-  if (addBtn) {
-    addBtn.addEventListener('click', showAddBudgetModal);
-  }
+function renderGoalCards(goals) {
+  const grid = document.getElementById('goals-grid');
+  if (!grid || goals.length === 0) return;
 
-  // Event delegation for edit/delete
-  const grid = document.getElementById('budgets-grid');
-  if (grid) {
-    grid.addEventListener('click', (e) => {
+  grid.innerHTML = goals.map(g => {
+    const progress = GoalService.getProgress(g);
+    const fillClass = progress.isCompleted ? 'green' : 'blue';
+
+    return `
+      <div class="budget-card" data-id="${g.id}">
+        <div class="budget-header">
+          <span class="budget-emoji">${g.icon}</span>
+          <span class="budget-name">${g.name}</span>
+          <button class="btn btn-sm btn-ghost" data-action="edit-goal" data-id="${g.id}" style="margin-left: auto; padding: 4px 8px;">✏️</button>
+          <button class="btn btn-sm btn-ghost" data-action="delete-goal" data-id="${g.id}" style="padding: 4px 8px;">🗑️</button>
+        </div>
+        <div class="budget-amount" style="font-family: var(--font-mono); font-size: 18px; margin-bottom: 12px; color: var(--accent-blue);">
+          ${sensitiveValueHtml(formatCurrency(g.savedAmount), { width: '10ch', copyValue: String(g.savedAmount), copyLabel: 'Saved amount' })} <span style="color: var(--text-muted); font-size: 14px;">/ ${sensitiveValueHtml(formatCurrency(g.targetAmount), { width: '10ch', copyValue: String(g.targetAmount), copyLabel: 'Target amount' })}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill ${fillClass}" style="width: ${progress.utilization}%"></div>
+        </div>
+        <div class="budget-status">
+          <span class="budget-spent">${progress.utilization.toFixed(1)}% reached</span>
+          <span class="budget-remaining" style="color: ${progress.isCompleted ? 'var(--accent-green)' : 'var(--text-muted)'};">
+            ${progress.isCompleted ? 'Goal Completed! 🎉' : `${sensitiveValueHtml(formatCurrency(progress.remaining), { width: '10ch', copyValue: String(progress.remaining), copyLabel: 'Remaining to goal' })} to go`}
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function setupEventListeners() {
+  const addBudgetBtn = document.getElementById('add-budget-btn');
+  if (addBudgetBtn) addBudgetBtn.addEventListener('click', () => showAddBudgetModal());
+
+  const addGoalBtn = document.getElementById('add-goal-btn');
+  if (addGoalBtn) addGoalBtn.addEventListener('click', () => showAddGoalModal());
+
+  // Event delegation for edit/delete budgets
+  const budgetGrid = document.getElementById('budgets-grid');
+  if (budgetGrid) {
+    budgetGrid.addEventListener('click', (e) => {
       const action = e.target.dataset.action;
       const id = e.target.dataset.id;
+      if (action === 'edit' && id) showEditBudgetModal(id);
+      else if (action === 'delete' && id) showDeleteBudgetConfirmation(id);
+    });
+  }
 
-      if (action === 'edit' && id) {
-        showEditBudgetModal(id);
-      } else if (action === 'delete' && id) {
-        showDeleteBudgetConfirmation(id);
-      }
+  // Event delegation for edit/delete goals
+  const goalsGrid = document.getElementById('goals-grid');
+  if (goalsGrid) {
+    goalsGrid.addEventListener('click', (e) => {
+      const action = e.target.dataset.action;
+      const id = e.target.dataset.id;
+      if (action === 'edit-goal' && id) showEditGoalModal(id);
+      else if (action === 'delete-goal' && id) showDeleteGoalConfirmation(id);
     });
   }
 }
@@ -225,6 +284,96 @@ function showDeleteBudgetConfirmation(id) {
   openModal('Delete Budget', 'Are you sure you want to delete this budget?', () => {
     BudgetService.delete(id);
     showToast('Budget deleted', 'success');
+    renderBudgets();
+    return true;
+  }, 'Delete');
+}
+
+// ── Goals Modals ────────────────────────────────────────────────────────────
+
+function showAddGoalModal() {
+  openModal('Add Saving Goal', `
+    <div class="form-group">
+      <label class="form-label">Goal Name *</label>
+      <input type="text" class="form-input" id="goal-name" placeholder="e.g. New Car, Emergency Fund">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Amount *</label>
+      <input type="number" class="form-input" id="goal-target" min="1" step="1000" placeholder="100000">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Already Saved (Optional)</label>
+      <input type="number" class="form-input" id="goal-saved" min="0" step="1000" placeholder="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Date (Optional)</label>
+      <input type="date" class="form-input" id="goal-date">
+    </div>
+  `, () => {
+    if (!canSubmit('add-goal-form')) return false;
+
+    const name = document.getElementById('goal-name').value;
+    const targetAmount = document.getElementById('goal-target').value;
+    const savedAmount = document.getElementById('goal-saved').value || 0;
+    const targetDate = document.getElementById('goal-date').value;
+
+    try {
+      GoalService.add({ name, targetAmount, savedAmount, targetDate });
+      showToast('Goal created', 'success');
+      renderBudgets();
+      return true;
+    } catch (error) {
+      showToast(translateError(error), 'error');
+      return false;
+    }
+  });
+}
+
+function showEditGoalModal(id) {
+  const goal = GoalService.getAll().find(g => g.id === id);
+  if (!goal) return;
+
+  openModal('Edit Saving Goal', `
+    <div class="form-group">
+      <label class="form-label">Goal Name *</label>
+      <input type="text" class="form-input" id="edit-goal-name" value="${goal.name}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Amount *</label>
+      <input type="number" class="form-input" id="edit-goal-target" min="1" step="1000" value="${goal.targetAmount}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Currently Saved</label>
+      <input type="number" class="form-input" id="edit-goal-saved" min="0" step="1000" value="${goal.savedAmount}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Date</label>
+      <input type="date" class="form-input" id="edit-goal-date" value="${goal.targetDate || ''}">
+    </div>
+  `, () => {
+    if (!canSubmit('edit-goal-form')) return false;
+
+    const name = document.getElementById('edit-goal-name').value;
+    const targetAmount = document.getElementById('edit-goal-target').value;
+    const savedAmount = document.getElementById('edit-goal-saved').value;
+    const targetDate = document.getElementById('edit-goal-date').value;
+
+    try {
+      GoalService.edit(id, { name, targetAmount, savedAmount, targetDate });
+      showToast('Goal updated', 'success');
+      renderBudgets();
+      return true;
+    } catch (error) {
+      showToast(translateError(error), 'error');
+      return false;
+    }
+  }, 'Save');
+}
+
+function showDeleteGoalConfirmation(id) {
+  openModal('Delete Goal', 'Are you sure you want to delete this saving goal? This will not delete your actual funds.', () => {
+    GoalService.delete(id);
+    showToast('Goal deleted', 'success');
     renderBudgets();
     return true;
   }, 'Delete');
