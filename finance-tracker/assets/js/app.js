@@ -273,7 +273,15 @@ function setupAuthHandlers() {
       const { error } = await signIn(email, password);
 
       if (error) {
-        showErrorBanner('login-error-banner', translateError(error));
+        const msg = error?.message || '';
+        let friendlyMsg = translateError(error);
+
+        // Special case: unconfirmed email — give a clear action
+        if (msg.includes('Email not confirmed') || msg.includes('email_not_confirmed')) {
+          friendlyMsg = 'Your email isn\'t verified yet. Check your inbox for a confirmation link.';
+        }
+
+        showErrorBanner('login-error-banner', friendlyMsg);
         shakeInput(loginForm);
       } else {
         hideAuthScreen();
@@ -297,24 +305,65 @@ function setupAuthHandlers() {
     e.preventDefault();
     const email = signupEmail.value.trim();
     const password = signupPassword.value;
+    const confirmPassword = signupPasswordConfirm?.value;
     const btn = document.getElementById('signup-submit-btn');
 
-    if (calculatePasswordStrength(password) < 2) {
-      showErrorBanner('signup-error-banner', 'Please choose a stronger password.');
+    // ── Client-side validation (no network call needed) ─────────────────────
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showErrorBanner('signup-error-banner', 'Please enter a valid email address.');
+      shakeInput(signupForm);
       return;
     }
 
+    if (!password || password.length < 6) {
+      showErrorBanner('signup-error-banner', 'Password must be at least 6 characters long.');
+      shakeInput(signupForm);
+      return;
+    }
+
+    if (calculatePasswordStrength(password) < 2) {
+      showErrorBanner('signup-error-banner', 'Please choose a stronger password (add numbers or symbols).');
+      shakeInput(signupForm);
+      return;
+    }
+
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      showErrorBanner('signup-error-banner', 'Passwords do not match.');
+      shakeInput(signupForm);
+      return;
+    }
+
+    // ── Submit to Supabase ──────────────────────────────────────────────────
     setButtonLoading(btn, 'Creating vault...');
     hideErrorBanner('signup-error-banner');
 
-    const { error, data } = await signUp(email, password);
+    const { error } = await signUp(email, password);
     setButtonReady(btn);
 
     if (error) {
-      showErrorBanner('signup-error-banner', translateError(error));
+      const msg = error?.message || '';
+      let friendlyMsg = translateError(error);
+
+      // Duplicate email: show a "Sign in instead" link inline
+      if (msg.includes('already registered') || msg.includes('User already registered')) {
+        showErrorBannerWithAction(
+          'signup-error-banner',
+          'This email is already registered.',
+          'Sign in instead',
+          () => switchAuthView('login')
+        );
+      } else {
+        showErrorBanner('signup-error-banner', friendlyMsg);
+      }
       shakeInput(signupForm);
     } else {
+      // Success — show confirmation screen
       document.getElementById('confirm-email-display').textContent = email;
+      // Reset confirm title/text in case it was changed by forgot password flow
+      const statusTitle = document.querySelector('#auth-view-confirm .auth-status-title');
+      const statusText = document.querySelector('#auth-view-confirm .auth-status-text');
+      if (statusTitle) statusTitle.textContent = 'Check your inbox!';
+      if (statusText) statusText.textContent = `We've sent a confirmation link to ${email}. Click it to activate your account.`;
       switchAuthView('confirm');
     }
   });
@@ -411,6 +460,14 @@ function showErrorBanner(id, msg) {
 
 function hideErrorBanner(id) {
   document.getElementById(id)?.classList.add('hidden');
+}
+
+function showErrorBannerWithAction(id, message, linkLabel, onLinkClick) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.innerHTML = `${message} <button type="button" style="background:none;border:none;color:var(--accent-amber);text-decoration:underline;cursor:pointer;font-size:inherit;padding:0;margin-left:4px;">${linkLabel}</button>`;
+  b.querySelector('button')?.addEventListener('click', onLinkClick);
+  b.classList.remove('hidden');
 }
 
 function shakeInput(el) {
