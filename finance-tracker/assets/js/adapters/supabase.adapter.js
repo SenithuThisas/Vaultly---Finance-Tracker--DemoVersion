@@ -12,6 +12,7 @@ const TABLES = {
   budgets: 'budgets',
   goals: 'goals',
   recurringRules: 'recurring_rules',
+  customCategories: 'custom_categories',
   settings: 'user_settings'
 };
 
@@ -73,22 +74,25 @@ export const supabaseAdapter = {
       const uid = user.id;
       const uidFilter = `user_id=eq.${uid}`;
 
-      const [fundSources, transactions, transfers, budgets, goals, recurringRules] = await Promise.all([
-        request('GET', TABLES.fundSources,    null, `?select=*&${uidFilter}&order=created_at`),
-        request('GET', TABLES.transactions,   null, `?select=*&${uidFilter}&order=date.desc`),
-        request('GET', TABLES.transfers,      null, `?select=*&${uidFilter}&order=date.desc`),
-        request('GET', TABLES.budgets,        null, `?select=*&${uidFilter}&order=created_at`),
-        request('GET', TABLES.goals,          null, `?select=*&${uidFilter}&order=created_at`),
-        request('GET', TABLES.recurringRules, null, `?select=*&${uidFilter}&order=created_at`),
+      const [fundSources, transactions, transfers, budgets, goals, recurringRules, customCategories] = await Promise.all([
+        request('GET', TABLES.fundSources,       null, `?select=*&${uidFilter}&order=created_at`),
+        request('GET', TABLES.transactions,      null, `?select=*&${uidFilter}&order=date.desc`),
+        request('GET', TABLES.transfers,         null, `?select=*&${uidFilter}&order=date.desc`),
+        request('GET', TABLES.budgets,           null, `?select=*&${uidFilter}&order=created_at`),
+        request('GET', TABLES.goals,             null, `?select=*&${uidFilter}&order=created_at`),
+        request('GET', TABLES.recurringRules,    null, `?select=*&${uidFilter}&order=created_at`),
+        request('GET', TABLES.customCategories,  null, `?select=*&${uidFilter}&order=created_at`)
+          .catch(() => [])   // graceful: table may not exist yet on older deployments
       ]);
 
       return {
-        fundSources:    (fundSources    || []).map(normalizeFundSource),
-        transactions:   (transactions   || []).map(normalizeTransaction),
-        transfers:      (transfers      || []).map(normalizeTransfer),
-        budgets:        (budgets        || []).map(normalizeBudget),
-        goals:          (goals          || []).map(normalizeGoal),
-        recurringRules: (recurringRules || []).map(normalizeRecurringRule),
+        fundSources:       (fundSources       || []).map(normalizeFundSource),
+        transactions:      (transactions      || []).map(normalizeTransaction),
+        transfers:         (transfers         || []).map(normalizeTransfer),
+        budgets:           (budgets           || []).map(normalizeBudget),
+        goals:             (goals             || []).map(normalizeGoal),
+        recurringRules:    (recurringRules    || []).map(normalizeRecurringRule),
+        customCategories:  (customCategories  || []).map(normalizeCustomCategory),
         settings: null
       };
     } catch (error) {
@@ -199,6 +203,18 @@ export const supabaseAdapter = {
     } catch {
       return null;
     }
+  },
+
+  // ── Custom Categories ─────────────────────────────────────────────────────
+  async insertCustomCategory(cat) {
+    return request('POST', TABLES.customCategories, toDbCustomCategory(cat))
+      .catch(() => null);  // graceful: table may not exist yet
+  },
+
+  async deleteCustomCategory(id) {
+    const user = getCurrentUser();
+    return request('DELETE', TABLES.customCategories, null, `?id=eq.${id}&user_id=eq.${user?.id}`)
+      .catch(() => null);
   },
 
   async subscribe(channel, callback) {
@@ -397,5 +413,30 @@ function toDbSettings(s) {
     currency: s.currency,
     date_format: s.dateFormat,
     user_name: s.userName
+  };
+}
+
+function normalizeCustomCategory(row) {
+  return {
+    id: row.id,
+    label: row.label,
+    emoji: row.emoji || '📦',
+    color: row.color || '#60A5FA',
+    type: row.type,
+    isCustom: true,
+    createdAt: row.created_at
+  };
+}
+
+function toDbCustomCategory(cat) {
+  const user = getCurrentUser();
+  return {
+    id: cat.id,
+    user_id: user?.id,
+    label: cat.label,
+    emoji: cat.emoji || '📦',
+    color: cat.color || '#60A5FA',
+    type: cat.type,
+    created_at: cat.createdAt || new Date().toISOString()
   };
 }

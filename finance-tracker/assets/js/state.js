@@ -11,6 +11,7 @@ let AppState = {
   transfers: [],
   budgets: [],
   recurringRules: [],
+  customCategories: [],
   currentView: 'dashboard',
   filters: {},
   ui: {
@@ -119,6 +120,7 @@ export function clearAppState() {
   AppState.budgets = [];
   AppState.goals = [];
   AppState.recurringRules = [];
+  AppState.customCategories = [];
   AppState.filters = {};
   AppState.currentView = 'dashboard';
   AppState.ui = {
@@ -200,6 +202,13 @@ export function dispatch(action, payload) {
     case 'EDIT_RECURRING_RULE':
       const rIdx = AppState.recurringRules.findIndex(r => r.id === payload.id);
       if (rIdx !== -1) AppState.recurringRules[rIdx] = payload;
+      break;
+    case 'ADD_CUSTOM_CATEGORY':
+      if (!AppState.customCategories) AppState.customCategories = [];
+      AppState.customCategories.push(payload);
+      break;
+    case 'DELETE_CUSTOM_CATEGORY':
+      AppState.customCategories = (AppState.customCategories || []).filter(c => c.id !== payload);
       break;
     case 'SET_VIEW':
       AppState.currentView = payload;

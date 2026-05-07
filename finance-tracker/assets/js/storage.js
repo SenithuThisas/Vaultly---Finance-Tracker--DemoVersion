@@ -88,6 +88,10 @@ export async function saveRecord(action, payload) {
         return supabaseAdapter.insertRecurringRule(payload);
       case 'EDIT_RECURRING_RULE':
         return supabaseAdapter.updateRecurringRule(payload);
+      case 'ADD_CUSTOM_CATEGORY':
+        return supabaseAdapter.insertCustomCategory(payload);
+      case 'DELETE_CUSTOM_CATEGORY':
+        return supabaseAdapter.deleteCustomCategory(payload);
       case 'UPDATE_SETTINGS':
         return supabaseAdapter.saveSettings(payload);
       default:
