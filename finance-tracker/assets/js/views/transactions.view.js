@@ -5,10 +5,12 @@
 import { getState, registerViewRenderer } from '../state.js';
 import { TransactionService } from '../services/transaction.service.js';
 import { FundSourceService } from '../services/fundSource.service.js';
+import { CategoryService } from '../services/category.service.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { openDrawer, closeDrawer } from '../components/drawer.js';
-import { CATEGORIES, CR_CATEGORIES, DR_CATEGORIES, CURRENCIES } from '../data/seed.js';
+import { openAddCategoryModal } from '../components/categoryPicker.js';
+import { CURRENCIES } from '../data/seed.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { canSubmit, setButtonLoading, setButtonReady, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
@@ -97,10 +99,10 @@ export function renderTransactions() {
 
 function populateCategoryFilter() {
   const select = document.getElementById('tx-category-filter');
-  if (select) {
-    select.innerHTML = '<option value="">All Categories</option>' +
-      CATEGORIES.map(c => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
-  }
+  if (!select) return;
+  const cats = CategoryService.getAll('ALL');
+  select.innerHTML = '<option value="">All Categories</option>' +
+    cats.map(c => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join('');
 }
 
 function setupEventListeners() {
@@ -183,7 +185,7 @@ function renderTransactionTable() {
   emptyEl.style.display = 'none';
 
   tbody.innerHTML = pagedRows.map(tx => {
-    const cat = CATEGORIES.find(c => c.id === tx.category) || { emoji: '📦', label: tx.category };
+    const cat = CategoryService.getById(tx.category);
     const fs = getState().fundSources.find(f => f.id === tx.fundSourceId);
     const date = new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
     const typeClass = tx.type === 'CR' ? 'cr' : 'dr';
@@ -350,13 +352,27 @@ export function showAddTransactionForm(editTxId = null) {
 function updateCategoryOptions(selectedCategory = null) {
   const type = document.querySelector('input[name="tx-type"]:checked')?.value || 'DR';
   const categorySelect = document.getElementById('tx-category');
-  const categories = type === 'CR' ? CR_CATEGORIES : DR_CATEGORIES;
+  const categories = CategoryService.getAll(type === 'CR' ? 'CR' : 'DR');
 
-  if (categorySelect) {
-    categorySelect.innerHTML = categories.map(c =>
+  if (!categorySelect) return;
+
+  categorySelect.innerHTML =
+    categories.map(c =>
       `<option value="${c.id}" ${selectedCategory === c.id ? 'selected' : ''}>${c.emoji} ${c.label}</option>`
-    ).join('');
-  }
+    ).join('') +
+    `<option value="__add_new__" style="color:var(--accent-blue,#60A5FA);font-weight:600;">＋ Add new category…</option>`;
+
+  // Sentinel listener — opens the add-category modal
+  categorySelect.addEventListener('change', function onSentinel(e) {
+    if (e.target.value !== '__add_new__') return;
+    // Revert while modal is open
+    e.target.value = selectedCategory || (categories[0]?.id ?? '');
+    const defaultType = type === 'CR' ? 'CR' : 'DR';
+    openAddCategoryModal(defaultType, (cat) => {
+      // Re-populate and auto-select the newly created category
+      updateCategoryOptions(cat.id);
+    });
+  }, { once: false });
 }
 
 function saveTransaction() {

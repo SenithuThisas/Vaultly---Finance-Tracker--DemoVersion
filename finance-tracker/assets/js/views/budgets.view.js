@@ -5,9 +5,11 @@
 import { getState, registerViewRenderer } from '../state.js';
 import { BudgetService } from '../services/budget.service.js';
 import { GoalService } from '../services/goal.service.js';
+import { CategoryService } from '../services/category.service.js';
 import { showToast } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
-import { CATEGORIES, DR_CATEGORIES } from '../data/seed.js';
+import { openAddCategoryModal } from '../components/categoryPicker.js';
+import { CATEGORIES } from '../data/seed.js';
 import { formatCurrency, formatPct } from '../utils/formatters.js';
 import { canSubmit, translateError } from '../security/index.js';
 import { sensitiveValueHtml } from '../security/privacy.js';
@@ -111,7 +113,7 @@ function renderBudgetCards(statuses) {
   if (!grid || statuses.length === 0) return;
 
   grid.innerHTML = statuses.map(b => {
-    const cat = CATEGORIES.find(c => c.id === b.category) || { emoji: '📦', label: b.category };
+    const cat = CategoryService.getById(b.category);
     const color = b.utilization > 90 ? 'var(--accent-red)' : b.utilization > 70 ? 'var(--accent-gold)' : 'var(--accent-green)';
     const fillClass = b.utilization > 90 ? 'red' : b.utilization > 70 ? 'amber' : 'green';
 
@@ -204,11 +206,13 @@ function setupEventListeners() {
 }
 
 function showAddBudgetModal(category = '') {
+  const drCats = CategoryService.getAll('DR');
   openModal('Add Budget', `
     <div class="form-group">
       <label class="form-label">Category *</label>
       <select class="form-input form-select" id="budget-category">
-        ${DR_CATEGORIES.map(c => `<option value="${c.id}" ${c.id === category ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('')}
+        ${drCats.map(c => `<option value="${c.id}" ${c.id === category ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('')}
+        <option value="__add_new__" style="color:var(--accent-blue,#60A5FA);font-weight:600;">＋ Add new category…</option>
       </select>
     </div>
     <div class="form-group">
@@ -221,7 +225,7 @@ function showAddBudgetModal(category = '') {
     const category = document.getElementById('budget-category').value;
     const limit = document.getElementById('budget-limit').value;
 
-    if (!category) {
+    if (!category || category === '__add_new__') {
       showToast('Please select a category', 'error');
       return false;
     }
@@ -240,6 +244,23 @@ function showAddBudgetModal(category = '') {
       return false;
     }
   });
+
+  // Attach sentinel listener after the modal DOM is ready
+  setTimeout(() => {
+    const sel = document.getElementById('budget-category');
+    if (!sel) return;
+    sel.addEventListener('change', (e) => {
+      if (e.target.value !== '__add_new__') return;
+      e.target.value = category || (drCats[0]?.id ?? '');
+      openAddCategoryModal('DR', (cat) => {
+        // Re-render the select with the new category selected
+        const opts = CategoryService.getAll('DR');
+        sel.innerHTML =
+          opts.map(c => `<option value="${c.id}" ${c.id === cat.id ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('') +
+          `<option value="__add_new__" style="color:var(--accent-blue,#60A5FA);font-weight:600;">＋ Add new category…</option>`;
+      });
+    });
+  }, 50);
 }
 
 function showEditBudgetModal(id) {
@@ -247,11 +268,13 @@ function showEditBudgetModal(id) {
   const budget = state.budgets.find(b => b.id === id);
   if (!budget) return;
 
+  const drCats = CategoryService.getAll('DR');
+
   openModal('Edit Budget', `
     <div class="form-group">
       <label class="form-label">Category</label>
       <select class="form-input form-select" id="edit-budget-category" disabled>
-        ${DR_CATEGORIES.map(c => `<option value="${c.id}" ${c.id === budget.category ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('')}
+        ${drCats.map(c => `<option value="${c.id}" ${c.id === budget.category ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('')}
       </select>
     </div>
     <div class="form-group">

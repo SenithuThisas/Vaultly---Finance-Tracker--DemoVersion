@@ -15,6 +15,8 @@
 
 import { db, isConfigured } from '../config/supabase.js';
 import { getState, dispatch, registerViewRenderer } from '../state.js';
+import { CategoryService } from '../services/category.service.js';
+import { openAddCategoryModal } from '../components/categoryPicker.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { showToast } from '../components/toast.js';
 import { setButtonLoading, setButtonReady, translateError, showErrorModal } from '../security/index.js';
@@ -116,6 +118,24 @@ function renderPendingList() {
   list.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => handleAction(btn));
   });
+
+  // Wire up "＋ Add new category" sentinel listeners for any open edit selects
+  list.querySelectorAll('select[data-field="category"]').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      if (e.target.value !== '__add_new__') return;
+      const entry = pendingEntries.find(en => `pending-cat-${en.id}` === sel.id);
+      const type = entry?.type || 'DR';
+      // Revert while modal opens
+      e.target.value = entry?.category || '';
+      openAddCategoryModal(type, (cat) => {
+        // Rebuild options with new category selected
+        const opts = CategoryService.getAll(type);
+        sel.innerHTML =
+          opts.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === cat.id ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('') +
+          `<option value="__add_new__" style="color:var(--accent-blue,#60A5FA);font-weight:600;">＋ Add new category…</option>`;
+      });
+    });
+  });
 }
 
 function buildAccountOptions(selectedId = null) {
@@ -166,7 +186,12 @@ function renderEntryCard(entry) {
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Category</label>
-              <input type="text" class="form-input" data-field="category" value="${escapeHtml(entry.category)}">
+              <select class="form-input form-select" data-field="category" id="pending-cat-${entry.id}">
+                ${CategoryService.getAll(entry.type || 'DR').map(c =>
+                  `<option value="${escapeHtml(c.id)}" ${c.id === entry.category || c.label.toLowerCase() === (entry.category || '').toLowerCase() ? 'selected' : ''}>${c.emoji} ${c.label}</option>`
+                ).join('')}
+                <option value="__add_new__" style="color:var(--accent-blue,#60A5FA);font-weight:600;">＋ Add new category…</option>
+              </select>
             </div>
             <div class="form-group">
               <label class="form-label">Amount</label>
@@ -239,8 +264,13 @@ async function saveEntry(id, button) {
   const card = button.closest('.pending-card');
   if (!card) return;
 
+  const rawCategory = card.querySelector('[data-field="category"]')?.value?.trim() || '';
+  // The select stores category IDs; resolve to label for the pending_transactions table
+  const catObj = rawCategory ? CategoryService.getById(rawCategory) : null;
+  const categoryValue = catObj && catObj.label !== rawCategory ? catObj.label : rawCategory;
+
   const payload = {
-    category: card.querySelector('[data-field="category"]')?.value?.trim() || '',
+    category: categoryValue,
     amount: Number(card.querySelector('[data-field="amount"]')?.value || 0),
     date: card.querySelector('[data-field="date"]')?.value || new Date().toISOString().split('T')[0],
     note: card.querySelector('[data-field="note"]')?.value?.trim() || null

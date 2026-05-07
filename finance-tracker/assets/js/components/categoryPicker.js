@@ -1,10 +1,10 @@
 /**
- * @fileoverview Shared "Add Category" UI helper.
+ * @fileoverview Shared "Add Category" modal.
  *
  * Call `openAddCategoryModal(type, onCreated)` from any view that has a
  * category <select>. The user fills in a name, optional emoji + colour, and
  * picks CR or DR.  On success, `onCreated(category)` is called so the caller
- * can update its own dropdown.
+ * can refresh its own dropdown.
  */
 
 import { CategoryService } from '../services/category.service.js';
@@ -13,7 +13,7 @@ import { showToast } from './toast.js';
 /**
  * Show the "Add new category" modal.
  *
- * @param {'CR'|'DR'|'ALL'} defaultType - Pre-select the type radio.
+ * @param {'CR'|'DR'} defaultType - Pre-select the type radio.
  * @param {(category: object) => void} onCreated - Callback with the new category.
  */
 export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
@@ -47,7 +47,7 @@ export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
         <div style="display:flex;gap:12px;">
           <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;
             background:var(--bg-hover,rgba(255,255,255,0.05));border-radius:8px;
-            border:2px solid ${defaultType==='DR'?'var(--accent-blue,#60A5FA)':'var(--border,rgba(255,255,255,0.1))'};
+            border:2px solid ${defaultType === 'DR' ? 'var(--accent-blue,#60A5FA)' : 'var(--border,rgba(255,255,255,0.1))'};
             cursor:pointer;" id="lbl-dr">
             <input type="radio" name="cat-type" value="DR" ${defaultType !== 'CR' ? 'checked' : ''}
               style="accent-color:var(--accent-blue,#60A5FA);">
@@ -55,7 +55,7 @@ export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
           </label>
           <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;
             background:var(--bg-hover,rgba(255,255,255,0.05));border-radius:8px;
-            border:2px solid ${defaultType==='CR'?'var(--accent-green,#10B981)':'var(--border,rgba(255,255,255,0.1))'};
+            border:2px solid ${defaultType === 'CR' ? 'var(--accent-green,#10B981)' : 'var(--border,rgba(255,255,255,0.1))'};
             cursor:pointer;" id="lbl-cr">
             <input type="radio" name="cat-type" value="CR" ${defaultType === 'CR' ? 'checked' : ''}
               style="accent-color:var(--accent-green,#10B981);">
@@ -82,7 +82,8 @@ export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
         <div class="form-group" style="flex:1;">
           <label class="form-label" style="margin-bottom:6px;display:block;">Colour</label>
           <input type="color" id="cat-color" value="#60A5FA"
-            style="width:100%;height:42px;border-radius:8px;border:1px solid var(--border,rgba(255,255,255,0.1));
+            style="width:100%;height:42px;border-radius:8px;
+            border:1px solid var(--border,rgba(255,255,255,0.1));
             cursor:pointer;background:none;padding:2px 4px;">
         </div>
       </div>
@@ -96,13 +97,12 @@ export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
 
   document.body.appendChild(overlay);
 
-  const modal   = overlay.querySelector('#add-cat-modal');
   const nameEl  = overlay.querySelector('#cat-name');
   const saveBtn = overlay.querySelector('#add-cat-save');
   const lblDr   = overlay.querySelector('#lbl-dr');
   const lblCr   = overlay.querySelector('#lbl-cr');
 
-  // Highlight selected radio label
+  // Highlight the active radio label border
   overlay.querySelectorAll('input[name="cat-type"]').forEach(r => {
     r.addEventListener('change', () => {
       lblDr.style.borderColor = r.value === 'DR'
@@ -118,6 +118,7 @@ export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
 
   overlay.querySelector('#add-cat-close').addEventListener('click', close);
   overlay.querySelector('#add-cat-cancel').addEventListener('click', close);
+  // Click-outside-to-close
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
   nameEl.focus();
@@ -138,51 +139,6 @@ export function openAddCategoryModal(defaultType = 'DR', onCreated = () => {}) {
     }
   });
 
-  // Allow Enter to submit
+  // Allow Enter to submit from the name field
   nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') saveBtn.click(); });
-}
-
-/**
- * Populate a <select> element with categories (built-in + custom),
- * appending a sentinel "＋ Add new category" option at the bottom.
- *
- * @param {HTMLSelectElement} selectEl
- * @param {'CR'|'DR'|'ALL'} type
- * @param {string|null} selectedId - Pre-select this id.
- * @param {(category: object) => void} [onCreated] - Called after a new category is saved.
- */
-export function populateCategorySelect(selectEl, type, selectedId = null, onCreated = null) {
-  if (!selectEl) return;
-
-  const { CategoryService: CS } = require_CategoryService();
-  const cats = CS.getAll(type);
-
-  selectEl.innerHTML =
-    cats.map(c =>
-      `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.emoji} ${c.label}</option>`
-    ).join('') +
-    `<option value="__add_new__" style="color:var(--accent-blue,#60A5FA);font-weight:600;">＋ Add new category…</option>`;
-
-  // Listen for the sentinel selection
-  selectEl.addEventListener('change', function handler(e) {
-    if (e.target.value !== '__add_new__') return;
-
-    // Revert the select to previous value while modal is open
-    e.target.value = selectedId || (cats[0]?.id ?? '');
-
-    const defaultType = type === 'ALL' ? 'DR' : type;
-
-    openAddCategoryModal(defaultType, (cat) => {
-      // Re-populate and auto-select the new category
-      const newOnCreated = onCreated;
-      populateCategorySelect(selectEl, type, cat.id, newOnCreated);
-      if (newOnCreated) newOnCreated(cat);
-    });
-  });
-}
-
-// Lazy getter to avoid circular deps with CategoryService importing state
-function require_CategoryService() {
-  // CategoryService is already imported above; expose as an object for the helper
-  return { CategoryService };
 }
